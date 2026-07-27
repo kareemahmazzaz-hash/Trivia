@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trivia Night - Join</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/config.js"></script>
+<script>
+  (TRANSPORT === "firebase"
+    ? ["https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
+       "https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js",
+       "js/firebase-config.js"]
+    : ["/socket.io/socket.io.js"]
+  ).forEach((src) => document.write(`<script src="${src}"><\/script>`));
+</script>
+</head>
+<body>
+  <div class="screen">
+    <div id="app" style="width:100%;"></div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/questions.js"></script>
+  <script src="js/gameClient.js"></script>
+  <script src="js/player.js"></script>
+</body>
+</html>

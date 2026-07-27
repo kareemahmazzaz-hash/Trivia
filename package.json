@@ -1,0 +1,13 @@
+{
+  "name": "trivia-night",
+  "version": "2.0.0",
+  "description": "Trivia night host app - works over LAN (Node/Socket.IO) or online (Firebase). See README.md.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
