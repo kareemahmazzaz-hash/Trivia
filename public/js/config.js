@@ -9,4 +9,4 @@
 //               Requires a free Firebase project - see README.md.
 //
 // Set the SAME value here on every device before game night.
-const TRANSPORT = "lan";
+const TRANSPORT = "firebase";
