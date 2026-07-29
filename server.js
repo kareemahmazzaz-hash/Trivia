@@ -24,6 +24,7 @@ function freshState() {
     category: null,         // current wheel category key ("geography", ... or "politics" for tie-breaker)
     questionIndex: -1,      // index into CATEGORIES[category].questions
     wheelTarget: null,      // wheel slot index (0-6) the TV should spin to
+    lastWheelTarget: null,  // slot index the wheel landed on last spin (persists across rounds, used to bias against repeats)
     pendingJoker: false,    // true once wheel lands on Joker, until host picks a category
     tiebreaker: false,
     categoryOrders: {},     // categoryKey -> shuffled draw order (built once at startQuestions)
@@ -98,6 +99,7 @@ io.on("connection", (socket) => {
     if (target == null) return;
     const key = WHEEL_KEYS[target];
     state.wheelTarget = target;
+    state.lastWheelTarget = target;
     state.pendingJoker = key === "joker";
     state.category = key === "joker" ? null : key;
     broadcast();

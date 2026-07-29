@@ -294,9 +294,23 @@ function availableWheelSlots(state) {
   }, []);
 }
 
+// Picking uniformly at random from ALL available slots every single time is
+// "correctly" random, but true independent randomness produces visible
+// streaks fairly often (e.g. the same category 2-3 spins in a row), which
+// reads as broken/rigged to players even though it isn't. To make spins
+// *feel* fair while staying random, we bias 85% of spins away from
+// whichever slot was landed on last time (tracked in state.lastWheelTarget)
+// - the other 15% of the time a true repeat is still allowed through, so
+// repeats can still happen, just less often than pure chance would give.
 function pickWheelTarget(state) {
   const slots = availableWheelSlots(state);
   if (!slots.length) return null;
+
+  const last = state.lastWheelTarget;
+  const nonRepeats = slots.filter((i) => i !== last);
+  if (last != null && nonRepeats.length && Math.random() < 0.85) {
+    return nonRepeats[Math.floor(Math.random() * nonRepeats.length)];
+  }
   return slots[Math.floor(Math.random() * slots.length)];
 }
 

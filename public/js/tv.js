@@ -49,7 +49,12 @@ async function playTeamsReveal() {
   const canvas = $("#wheel");
   for (const step of order) {
     const target = remaining.indexOf(step.name);
-    await spinWheelAsync(canvas, remaining, target);
+    // With 2 (or 1) names left there's nothing left to "reveal" - spinning a
+    // wheel with only one or two slices is pointless and looks broken, so
+    // just place the rest without animating.
+    if (remaining.length > 2) {
+      await spinWheelAsync(canvas, remaining, target);
+    }
     const slot = document.createElement("div");
     slot.className = "member";
     slot.textContent = step.name;
@@ -128,7 +133,9 @@ function wheelRestRotation(targetIndex) {
 function categoryStepMessage() {
   if (state.wheelTarget == null) return "🎡 Waiting for the host to spin...";
   if (state.pendingJoker) return "🃏 Joker! Host is picking a category...";
-  if (state.category) return CATEGORIES[state.category].label;
+  // Once the wheel has landed on a real category, don't spoil it here below
+  // the wheel - the host sees it on their phone, and it's revealed to
+  // everyone at the top of the question screen once confirmed.
   return "";
 }
 

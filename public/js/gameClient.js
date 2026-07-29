@@ -12,7 +12,7 @@ const gameClient = (function () {
   function freshState() {
     return {
       phase: "setup", step: null, players: {}, teams: {}, scores: {},
-      category: null, questionIndex: -1, wheelTarget: null, pendingJoker: false,
+      category: null, questionIndex: -1, wheelTarget: null, lastWheelTarget: null, pendingJoker: false,
       tiebreaker: false, categoryOrders: {}, categoryPointers: {},
       buzzesOpen: false, buzzes: {}
     };
@@ -158,6 +158,7 @@ const gameClient = (function () {
         const key = WHEEL_KEYS[target];
         await r("state").update({
           wheelTarget: target,
+          lastWheelTarget: target,
           pendingJoker: key === "joker",
           category: key === "joker" ? null : key
         });
