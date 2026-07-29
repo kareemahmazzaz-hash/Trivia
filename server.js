@@ -3,7 +3,10 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 const { Server } = require("socket.io");
-const { TEAM_SIZE, QUESTIONS, computeNextStep } = require("./public/js/questions.js");
+const {
+  TEAM_SIZE, WHEEL_KEYS, buzzKey, computeNextStep,
+  buildAllDrawOrders, drawNextQuestionIndex, pickWheelTarget
+} = require("./public/js/questions.js");
 
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
@@ -14,11 +17,17 @@ const io = new Server(server);
 function freshState() {
   return {
     phase: "setup",      // setup -> teams -> lobby -> question -> gameover
-    step: null,            // question -> answer -> [bonus_question -> bonus_answer] -> (next question)
+    step: null,            // category -> question -> answer -> [bonus_question -> bonus_answer] -> (category again, or tiebreak_done)
     players: {},           // name -> { team, joined, pid }
     teams: {},              // idx -> { name, members: [] }
     scores: {},             // idx -> number
-    questionIndex: -1,
+    category: null,         // current wheel category key ("geography", ... or "politics" for tie-breaker)
+    questionIndex: -1,      // index into CATEGORIES[category].questions
+    wheelTarget: null,      // wheel slot index (0-6) the TV should spin to
+    pendingJoker: false,    // true once wheel lands on Joker, until host picks a category
+    tiebreaker: false,
+    categoryOrders: {},     // categoryKey -> shuffled draw order (built once at startQuestions)
+    categoryPointers: {},   // categoryKey -> how many questions already drawn from it
     buzzesOpen: false,
     buzzes: {}              // buzzKey -> [{ name, team, pid, ts }]
   };
@@ -41,10 +50,6 @@ function shuffle(arr) {
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
-}
-
-function buzzKey(s) {
-  return s.step === "bonus_question" || s.step === "bonus_answer" ? `${s.questionIndex}-bonus` : `${s.questionIndex}`;
 }
 
 io.on("connection", (socket) => {
@@ -74,7 +79,44 @@ io.on("connection", (socket) => {
 
   socket.on("host:startQuestions", () => {
     state.phase = "question";
-    state.questionIndex = 0;
+    state.step = "category";
+    state.category = null;
+    state.questionIndex = -1;
+    state.wheelTarget = null;
+    state.pendingJoker = false;
+    state.tiebreaker = false;
+    state.categoryOrders = buildAllDrawOrders();
+    state.categoryPointers = {};
+    state.buzzesOpen = false;
+    broadcast();
+  });
+
+  // Host spins the wheel: pick a random available slot and broadcast it so
+  // the TV can animate toward it.
+  socket.on("host:spinCategory", () => {
+    const target = pickWheelTarget(state);
+    if (target == null) return;
+    const key = WHEEL_KEYS[target];
+    state.wheelTarget = target;
+    state.pendingJoker = key === "joker";
+    state.category = key === "joker" ? null : key;
+    broadcast();
+  });
+
+  // Host picks a category after landing on Joker.
+  socket.on("host:chooseJokerCategory", (key) => {
+    if (!state.pendingJoker) return;
+    state.category = key;
+    state.pendingJoker = false;
+    broadcast();
+  });
+
+  // Host confirms the chosen category: draws the next question from it.
+  socket.on("host:confirmCategory", () => {
+    if (!state.category) return;
+    const { questionIndex, nextPointer } = drawNextQuestionIndex(state, state.category);
+    state.questionIndex = questionIndex;
+    state.categoryPointers[state.category] = nextPointer;
     state.step = "question";
     state.buzzesOpen = true;
     state.buzzes[buzzKey(state)] = [];
@@ -82,17 +124,49 @@ io.on("connection", (socket) => {
   });
 
   socket.on("host:next", () => {
-    const result = computeNextStep(state, QUESTIONS);
+    const result = computeNextStep(state);
     if (!result) return;
-    if (result.gameover) {
-      state.phase = "gameover";
-      state.buzzesOpen = false;
-    } else {
-      if (result.questionIndex !== undefined) state.questionIndex = result.questionIndex;
-      state.step = result.step;
-      state.buzzesOpen = result.buzzesOpen;
-      if (result.clearBuzz) state.buzzes[buzzKey(state)] = [];
+    state.step = result.step;
+    state.buzzesOpen = result.buzzesOpen;
+    if (result.resetCategory) {
+      state.category = null;
+      state.questionIndex = -1;
+      state.wheelTarget = null;
+      state.pendingJoker = false;
     }
+    if (result.hasMorePolitics !== undefined) state.hasMorePolitics = result.hasMorePolitics;
+    if (result.clearBuzz) state.buzzes[buzzKey(state)] = [];
+    broadcast();
+  });
+
+  // Tie-breaker: switches to the Politics pool, which is never on the wheel.
+  socket.on("host:startTiebreaker", () => {
+    const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
+    state.tiebreaker = true;
+    state.category = "politics";
+    state.questionIndex = questionIndex;
+    state.categoryPointers.politics = nextPointer;
+    state.step = "question";
+    state.buzzesOpen = true;
+    state.wheelTarget = null;
+    state.pendingJoker = false;
+    state.buzzes[buzzKey(state)] = [];
+    broadcast();
+  });
+
+  socket.on("host:nextTiebreakQuestion", () => {
+    const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
+    state.questionIndex = questionIndex;
+    state.categoryPointers.politics = nextPointer;
+    state.step = "question";
+    state.buzzesOpen = true;
+    state.buzzes[buzzKey(state)] = [];
+    broadcast();
+  });
+
+  socket.on("host:finishGame", () => {
+    state.phase = "gameover";
+    state.buzzesOpen = false;
     broadcast();
   });
 
@@ -151,6 +225,5 @@ server.listen(PORT, () => {
       console.log(`   On your WiFi:      http://${net.address}:${PORT}`);
     }
   });
-  console.log(`\n   Open the "On your WiFi" address on the TV/laptop and on your host phone.`);
-  console.log(`   ${QUESTIONS.length} questions loaded.\n`);
+  console.log(`\n   Open the "On your WiFi" address on the TV/laptop and on your host phone.\n`);
 });
