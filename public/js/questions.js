@@ -303,7 +303,7 @@ function pickWheelTarget(state) {
 // Draws the next question index for a category, advancing its pointer.
 function drawNextQuestionIndex(state, categoryKey) {
   const order = state.categoryOrders[categoryKey];
-  const ptr = state.categoryPointers[categoryKey] || 0;
+  const ptr = (state.categoryPointers && state.categoryPointers[categoryKey]) || 0;
   return { questionIndex: order[ptr], nextPointer: ptr + 1 };
 }
 
