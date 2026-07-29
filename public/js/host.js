@@ -23,14 +23,14 @@ function render() {
 function renderSetup() {
   app.innerHTML = `
     <h2>Set up players</h2>
-    <p style="color:var(--muted)">One name per line. Need a multiple of ${TEAM_SIZE} for even teams.</p>
+    <p style="color:var(--muted)">One name per line. Teams of ${TEAM_SIZE} — any leftover players join the last team.</p>
     <textarea id="names" rows="10" style="width:100%;">${DEFAULT_PLAYER_NAMES.join("\n")}</textarea>
     <button id="startBtn" style="width:100%; margin-top:14px;">🎡 Assign Teams</button>
   `;
   $("#startBtn").onclick = () => {
     const names = $("#names").value.split("\n").map((n) => n.trim()).filter(Boolean);
-    if (names.length % TEAM_SIZE !== 0) {
-      alert(`Number of players (${names.length}) isn't a multiple of team size (${TEAM_SIZE}).`);
+    if (names.length < TEAM_SIZE) {
+      alert(`Need at least ${TEAM_SIZE} players.`);
       return;
     }
     gameClient.startGame(names);

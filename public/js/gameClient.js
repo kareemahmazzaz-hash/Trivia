@@ -97,11 +97,23 @@ const gameClient = (function () {
         const shuffled = shuffle(names);
         const teams = {};
         const players = {};
+        let lastIdx = -1;
         for (let i = 0; i < shuffled.length; i += TEAM_SIZE) {
+          const remaining = shuffled.length - i;
+          // If what's left won't make a full team on its own, fold it into
+          // the last team we already created instead of leaving a lonely
+          // partial team behind.
+          if (remaining < TEAM_SIZE && lastIdx >= 0) {
+            const leftovers = shuffled.slice(i);
+            teams[lastIdx].members.push(...leftovers);
+            leftovers.forEach((n) => (players[n] = { team: lastIdx, joined: false, pid: null }));
+            break;
+          }
           const idx = i / TEAM_SIZE;
           const members = shuffled.slice(i, i + TEAM_SIZE);
           teams[idx] = { name: `Team ${idx + 1}`, members };
           members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
+          lastIdx = idx;
         }
         const scores = {};
         Object.keys(teams).forEach((idx) => (scores[idx] = 0));
