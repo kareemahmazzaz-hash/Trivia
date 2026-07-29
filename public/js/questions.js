@@ -30,19 +30,22 @@ const CATEGORIES = {
   geography: {
     label: "Geography",
     questions: [
-      { text: "What is the smallest country in the world?", answer: "Vatican City" },
-      { text: "What is the capital of Morocco?", answer: "Rabat" },
+      { text: "What is the smallest country in the world?", franko: "As8ar dawla fel 3alam?", answer: "Vatican City" },
+      { text: "What is the capital of Morocco?", franko: "3asmet el maghrib?", answer: "Rabat" },
       {
         text: "The Nile River begins from two countries — which two?",
+        franko: "Nahr el nile beybda2 mn 2ny dwal?",
         answer: "Ethiopia and Uganda",
-        bonus: { text: "What are the two rivers called?", answer: "The White Nile (Uganda) and the Blue Nile (Ethiopia)" }
+        bonus: { text: "What are the two rivers called?", franko: "Asamy el anhar?", answer: "The White Nile (Uganda) and the Blue Nile (Ethiopia)" }
       },
-      { text: "How many time zones does China have?", answer: "1" },
+      { text: "How many time zones does China have?", franko: "El Seen feha kam mate2a zamaneya?", answer: "1" },
       {
         text: "Egypt ranks 13th in population — who ranks 14th?",
+        franko: "Masr raqam 13 fel t3dad el sokany, meen raqam 14?",
         answer: "The Philippines",
-        bonus: { text: "What is its capital?", answer: "Manila" }
+        bonus: { text: "What is its capital?", franko: "Eh 3asemtha?", answer: "Manila" }
       },
+      // No franko phrasing given in the doc for the flag intro line - stays in English.
       { text: "Guess the country from its flag:", answer: "Mozambique", image: "images/flags/flag-mozambique.jpg" },
       { text: "Guess the country from its flag:", answer: "Nepal", image: "images/flags/flag-nepal.png" },
       { text: "Guess the country from its flag:", answer: "Malta", image: "images/flags/flag-malta.png" },
@@ -54,32 +57,36 @@ const CATEGORIES = {
   history: {
     label: "History",
     questions: [
-      { text: "In what year was Egypt conquered (opened to Islam)?", answer: "20 AH, corresponding to 641 CE" },
+      { text: "In what year was Egypt conquered (opened to Islam)?", franko: "Masr eftote7at sanat kam?", answer: "20 AH, corresponding to 641 CE" },
       {
         text: "In what year did the Ottoman Empire begin?",
+        franko: "El embratorya el 3othmaneya bada2t sanet kam?",
         answer: "1299",
-        bonus: { text: "When did it occupy Egypt?", answer: "1517" }
+        bonus: { text: "When did it occupy Egypt?", franko: "E7talo masr emta?", answer: "1517" }
       },
       {
         text: "When did World War I begin?",
+        franko: "WW1 bda2t emta?",
         answer: "1914",
-        bonus: { text: "When did it end?", answer: "1918" }
+        bonus: { text: "When did it end?", franko: "5lset emta?", answer: "1918" }
       },
       {
         text: "Who was the richest person in history?",
+        franko: "Meen a8na wa7ed fel taree5?",
         answer: "Mansa Musa",
-        bonus: { text: "What empire did he rule?", answer: "Mali" }
+        bonus: { text: "What empire did he rule?", franko: "Eh el embratorya el 7akmha?", answer: "Mali" }
       },
-      { text: "Who invented the light bulb?", answer: "Ebenezer Kinnersley, James Lindsay, Alexander de Lodyguine, and Franjo Hanaman" },
-      { text: "Who was the first Arab to win a Nobel Prize, and in what year?", answer: "Ahmed Zewail, Chemistry, 1999" },
-      { text: "What was the first pyramid built in Egypt?", answer: "The Pyramid of Djoser / the Step Pyramid, at Saqqara" },
+      { text: "Who invented the light bulb?", franko: "Meen e5tra3 el lamba?", answer: "Ebenezer Kinnersley, James Lindsay, Alexander de Lodyguine, and Franjo Hanaman" },
+      { text: "Who was the first Arab to win a Nobel Prize, and in what year?", franko: "Meen awel 3araby ya5od gayzet nobel, w 5adha f sanat eh?", answer: "Ahmed Zewail, Chemistry, 1999" },
+      { text: "What was the first pyramid built in Egypt?", franko: "Awel haram etbana f masr?", answer: "The Pyramid of Djoser / the Step Pyramid, at Saqqara" },
       {
         text: "In what year did the first computer appear?",
+        franko: "Eh el sana el zahar feha awel computer?",
         answer: "1946",
-        bonus: { text: "Where?", answer: "Philadelphia, USA" }
+        bonus: { text: "Where?", franko: "Fen?", answer: "Philadelphia, USA" }
       },
-      { text: "Who killed the most people?", answer: "Genghis Khan" },
-      { text: "Which country had the highest number of deaths in World War II?", answer: "The Soviet Union, around 27 million, followed by China with 15-20 million" }
+      { text: "Who killed the most people?", franko: "Meen aktar wa7ed atal fel taree5?", answer: "Genghis Khan" },
+      { text: "Which country had the highest number of deaths in World War II?", franko: "Eh el dawla el kan feha akbar 3adad amwat fe WW2?", answer: "The Soviet Union, around 27 million, followed by China with 15-20 million" }
     ]
   },
 
@@ -88,61 +95,71 @@ const CATEGORIES = {
     questions: [
       {
         text: "What is the chemical symbol for Germanium?",
+        franko: "Eh el chemical symbol le 2ny element?",
         answer: "Ge",
-        bonus: { text: "In which country was it discovered?", answer: "Germany" }
+        bonus: { text: "In which country was it discovered?", franko: "El ektshafo mn 2ny dawla?", answer: "Germany" }
       },
-      { text: "What color is liquid oxygen?", answer: "Blue" },
-      { text: "Which element gives a flame a purple color when it burns?", answer: "Potassium" },
-      { text: "What is the largest organ in the human body?", answer: "The skin" },
-      { text: "What is the only major organ in the human body that can regenerate itself?", answer: "The liver" },
+      { text: "What color is liquid oxygen?", franko: "Eh lon el oxygen el sa2el?", answer: "Blue" },
+      { text: "Which element gives a flame a purple color when it burns?", franko: "Eh el element el beyde lon purple?", answer: "Potassium" },
+      { text: "What is the largest organ in the human body?", franko: "Eh akbar 3odw f gesm el ensan?", answer: "The skin" },
+      { text: "What is the only major organ in the human body that can regenerate itself?", franko: "Eh el 3odw el ra2sy el wa7eed fel ensan el beygaded nafso?", answer: "The liver" },
       {
         text: "By weight, what is the largest living organism on Earth?",
+        franko: "Mn na7yet el wazn, eh akbar ka2en 3ayesh 3ala el ard?",
         answer: "The quaking aspen (the \"Pando\" colony)",
-        bonus: { text: "Where is it located?", answer: "Utah, USA" }
+        bonus: { text: "Where is it located?", franko: "Yaqa3 fen?", answer: "Utah, USA" }
       },
-      { text: "What is the speed of light?", answer: "299,705 km/s" },
+      { text: "What is the speed of light?", franko: "Eh sor3et el do2?", answer: "299,705 km/s" },
       {
         text: "What is the diameter of the Earth?",
+        franko: "Qotr el ard eh?",
         answer: "12,756 km",
-        bonus: { text: "What is the mass of the Earth?", answer: "5.97 × 10^24 kg" }
+        bonus: { text: "What is the mass of the Earth?", franko: "Wazn el ard eh?", answer: "5.97 × 10^24 kg" }
       },
-      { text: "What is the Moon's gravity?", answer: "1.625 m/s²" },
-      { text: "How old is the universe?", answer: "13.8 billion years" }
+      { text: "What is the Moon's gravity?", franko: "Gazbeyet el amar eh?", answer: "1.625 m/s²" },
+      { text: "How old is the universe?", franko: "Eh 3omr el kon?", answer: "13.8 billion years" }
     ]
   },
 
   sports: {
     label: "Sports",
     questions: [
-      { text: "What does NBA stand for?", answer: "National Basketball Association" },
-      { text: "Who won the Men's African Basketball Championship in 1962, 1964, 1970, 1975, and 1983?", answer: "Egypt" },
+      { text: "What does NBA stand for?", franko: "NBA e5tsar eh?", answer: "National Basketball Association" },
+      { text: "Who won the Men's African Basketball Championship in 1962, 1964, 1970, 1975, and 1983?", franko: "Meen keseb el afrobasket lel regala fe 1962, 1964, 1970, 1975, 1983?", answer: "Egypt" },
       {
         text: "In which country was volleyball invented?",
+        franko: "Volleyball e5tore3at f balad eh?",
         answer: "The United States",
-        bonus: { text: "In what year?", answer: "1895" }
+        bonus: { text: "In what year?", franko: "Sanat kam?", answer: "1895" }
       },
-      { text: "Which club holds 8 titles in the Arab Club Volleyball Championship?", answer: "Al Ahly" },
+      { text: "Which club holds 8 titles in the Arab Club Volleyball Championship?", franko: "Eh el fer2a el ta7mel 8 alqab fe el btoola el 3arabeya l ndeyet el volleyball?", answer: "Al Ahly" },
       {
         text: "How many gold medals did Michael Phelps win?",
+        franko: "Michael Phelps 5ad kam madelya dahabeya?",
         answer: "23",
-        bonus: { text: "How many medals in total?", answer: "28" }
+        bonus: { text: "How many medals in total?", franko: "Tb kam madelya 3amatan?", answer: "28" }
       },
-      { text: "Who won the gold medal in the 400m swim at Tokyo 2020?", answer: "Tunisia's Ahmed Hafnaoui, at age 18" },
-      { text: "In handball, how many players are allowed on the court at the same time?", answer: "14" },
+      { text: "Who won the gold medal in the 400m swim at Tokyo 2020?", franko: "Meen 5ad el madelya el dahabeya fel seba7a el 400m fe Tokyo 2020?", answer: "Tunisia's Ahmed Hafnaoui, at age 18" },
+      { text: "In handball, how many players are allowed on the court at the same time?", franko: "Fel handball, fe kam la3eb masmo7 yeb2a mawgood fel court f nafs el wa2t?", answer: "14" },
       {
         text: "In handball, Egypt made history at Tokyo 2020 by beating which team in the quarterfinals?",
+        franko: "Fel handball, masr sana3at el taree5 lama kesbet 2ny faree2 f Tokyo 2020 fel rob3 el neha2y?",
         answer: "Germany",
-        bonus: { text: "Why did it make history?", answer: "Egypt became the first African and non-European team to reach the semifinals" }
+        bonus: { text: "Why did it make history?", franko: "Leh sana3et el taree5?", answer: "Egypt became the first African and non-European team to reach the semifinals" }
       },
       {
         text: "In which country was squash invented?",
+        franko: "Squash o5tor3at f balad eh?",
         answer: "London, England",
-        bonus: { text: "When?", answer: "1830" }
+        bonus: { text: "When?", franko: "Emta?", answer: "1830" }
       },
-      { text: "Which player won the World Squash Championship for the eighth time in 2024?", answer: "Nour El Sherbini" }
+      { text: "Which player won the World Squash Championship for the eighth time in 2024?", franko: "Mn el la3ba el fazet blaqab btoolet el 3alam lel squash ll mara el tamna fe 2024?", answer: "Nour El Sherbini" }
     ]
   },
 
+  // Doc's math problems were a completely different set from these, so
+  // rather than mixing question sets these stay in English on the host
+  // screen, per your call.
   math: {
     label: "Math",
     questions: [
@@ -162,27 +179,32 @@ const CATEGORIES = {
   general: {
     label: "General Knowledge",
     questions: [
-      { text: "How do dogs perceive the color red?", answer: "As dark brown / gray / black" },
-      { text: "What is the rarest and most expensive spice in the world by weight?", answer: "Saffron" },
+      { text: "How do dogs perceive the color red?", franko: "El kelab beyshofo el lon el a7mar eh?", answer: "As dark brown / gray / black" },
+      { text: "What is the rarest and most expensive spice in the world by weight?", franko: "Eh andar w a8la bohar fel 3alam bel wazn?", answer: "Saffron" },
       {
         text: "Which fruit was once believed to be poisonous in Europe?",
+        franko: "Eh el thamara el kano fakrenha qatela f oroba?",
         answer: "The tomato",
-        bonus: { text: "Why?", answer: "It used to be served on pewter plates, and it reacted with the tomato's acid to form a toxic compound" }
+        bonus: { text: "Why?", franko: "Leh?", answer: "It used to be served on pewter plates, and it reacted with the tomato's acid to form a toxic compound" }
       },
-      { text: "Which planet has the most moons?", answer: "Saturn" },
+      { text: "Which planet has the most moons?", franko: "Eh el kawkab el 3ando akbar 3adad aqmar?", answer: "Saturn" },
+      // Doc's item in this slot was a different (Quran-related) question, so this one stays in English.
       { text: "What causes the \"pool\" smell?", answer: "Urea" },
-      { text: "How many keys does a piano have?", answer: "88" },
+      { text: "How many keys does a piano have?", franko: "El piano fe kam mofta7?", answer: "88" },
       {
         text: "How many hearts does an octopus have?",
+        franko: "El o5tboot 3ando kam alb?",
         answer: "3",
-        bonus: { text: "What color is its blood?", answer: "Blue" }
+        bonus: { text: "What color is its blood?", franko: "Eh lon damo?", answer: "Blue" }
       },
       {
         text: "What is the largest ocean in the world?",
+        franko: "Eh akbar mo7eet fel 3alam?",
         answer: "The Pacific Ocean",
-        bonus: { text: "What is the smallest?", answer: "The Arctic Ocean" }
+        bonus: { text: "What is the smallest?", franko: "Eh as8ar wa7ed?", answer: "The Arctic Ocean" }
       },
-      { text: "What is the most abundant element in the human body?", answer: "Oxygen" },
+      { text: "What is the most abundant element in the human body?", franko: "Eh aktar 3onsor motwage f gesm el ensan?", answer: "Oxygen" },
+      // Doc's item in this slot was a different (Quran-related) question, so this one stays in English.
       { text: "What is the densest material in the world?", answer: "Osmium" }
     ]
   },
@@ -192,32 +214,36 @@ const CATEGORIES = {
   politics: {
     label: "Politics",
     questions: [
-      { text: "How many presidents has Egypt had?", answer: "6" },
+      { text: "How many presidents has Egypt had?", franko: "Masr leha kam ra2ees?", answer: "6" },
       {
         text: "Who was the Chief of Staff during the October War, before \"the Gap\" (the Israeli crossing)?",
+        franko: "Meen kan ra2ees el arkan f 7arb october abl el sa8ra?",
         answer: "Saad El Shazly",
-        bonus: { text: "Why did Sadat remove him?", answer: "(host's call — no fixed answer recorded)" }
+        bonus: { text: "Why did Sadat remove him?", franko: "El sadat masha leh?", answer: "(host's call — no fixed answer recorded)" }
       },
-      { text: "How many articles does the Egyptian constitution contain?", answer: "254" },
+      { text: "How many articles does the Egyptian constitution contain?", franko: "El dostoor el masry fe kam mada?", answer: "254" },
       {
         text: "One of the organizers of the January 25 Revolution ran a page named after a martyr, called \"We Are All ______\" — what was the martyr's name?",
+        franko: "A7ad monazmeen sawret 25 yanaya kan 3ala esm shaheed \"Kolena ____\" — eh esmo?",
         answer: "Khaled Said",
-        bonus: { text: "Who were the other organizers?", answer: "The April 6 Youth Movement, We Are All Khaled Said, the National Association for Change, the Kefaya Movement, and the January 25 Movement" }
+        bonus: { text: "Who were the other organizers?", franko: "Meen ba2y el monazmeen?", answer: "The April 6 Youth Movement, We Are All Khaled Said, the National Association for Change, the Kefaya Movement, and the January 25 Movement" }
       },
       {
         text: "How many people died in the January 25 Revolution?",
+        franko: "Fe kam wa7ed mat f sawret 25 yanaya?",
         answer: "846",
-        bonus: { text: "How many were injured?", answer: "Fewer than 6,000" }
+        bonus: { text: "How many were injured?", franko: "Fe kam wa7ed etsab?", answer: "Fewer than 6,000" }
       },
-      { text: "In what year was Sadat assassinated?", answer: "1981" },
-      { text: "In what year(s) was Sinai liberated?", answer: "1982-1989" },
+      { text: "In what year was Sadat assassinated?", franko: "El sadat et2atal sanat kam?", answer: "1981" },
+      { text: "In what year(s) was Sinai liberated?", franko: "Sina et7araret sanat kam?", answer: "1982-1989" },
       {
         text: "Egypt didn't appoint a president right after King Farouk — a king briefly held the position before being removed. What was his name?",
+        franko: "Masr ma3yantsh ra2ees ba3d el malek Farouk 3alatool — fe malek 5ad el manseb ba3deh w etshal ba3deha 3alatool, esmo eh?",
         answer: "King Fuad II",
-        bonus: { text: "How old was he?", answer: "7 months old" }
+        bonus: { text: "How old was he?", franko: "Kan 3omro kam?", answer: "7 months old" }
       },
-      { text: "One of the main causes of the 1952 Revolution was the taxes placed on agricultural land. What was the most important crop that was taxed more heavily at the time?", answer: "Cotton" },
-      { text: "Who led the 1952 Revolution, and what was his rank?", answer: "Major General Muhammad Naguib" }
+      { text: "One of the main causes of the 1952 Revolution was the taxes placed on agricultural land. What was the most important crop that was taxed more heavily at the time?", franko: "Mn aham azbab thawret 1952 el darayeb el kanet btet7at 3ala el arady el zera3eya. Eh aham ma7sool zadet 3aleh el darayeb sa3etha?", answer: "Cotton" },
+      { text: "Who led the 1952 Revolution, and what was his rank?", franko: "Meen kan qa2ed thawret 1952, w eh kan mansebo?", answer: "Major General Muhammad Naguib" }
     ]
   }
 };
