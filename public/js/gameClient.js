@@ -52,6 +52,7 @@ const gameClient = (function () {
       score: (teamIdx, delta) => socket.emit("host:score", { teamIdx, delta }),
       setScore: (teamIdx, value) => socket.emit("host:setScore", { teamIdx, value }),
       reset: () => socket.emit("host:reset"),
+      setTeamName: (teamIdx, name) => socket.emit("player:setTeamName", { teamIdx, name }),
       join: (name, cb) => socket.emit("player:join", { name }, cb),
       rejoin: (name, pid, cb) => socket.emit("player:rejoin", { name, pid }, cb),
       buzz: (name, pid) => socket.emit("player:buzz", { name, pid })
@@ -71,11 +72,25 @@ const gameClient = (function () {
       else if (connectedOnce) onStatus && onStatus("error");
     });
 
+    // Every write triggers multiple "value" listeners (state/players/teams/
+    // scores/buzzes), each of which calls recompute(). Those calls can
+    // resolve out of order. This counter makes sure only the most recently
+    // *started* recompute is ever allowed to actually apply its result, so a
+    // slow/stale read can never clobber a newer one.
+    let recomputeGen = 0;
     async function recompute() {
-      const [s, players, teams, scores, buzzes] = await Promise.all([
-        r("state").once("value"), r("players").once("value"),
-        r("teams").once("value"), r("scores").once("value"), r("buzzes").once("value")
-      ]);
+      const myGen = ++recomputeGen;
+      let s, players, teams, scores, buzzes;
+      try {
+        [s, players, teams, scores, buzzes] = await Promise.all([
+          r("state").once("value"), r("players").once("value"),
+          r("teams").once("value"), r("scores").once("value"), r("buzzes").once("value")
+        ]);
+      } catch (err) {
+        console.error("[gameClient] failed to read state:", err);
+        return;
+      }
+      if (myGen !== recomputeGen) return; // superseded by a newer read
       state = {
         ...(s.val() || { phase: "setup" }),
         players: players.val() || {},
@@ -111,7 +126,7 @@ const gameClient = (function () {
           }
           const idx = i / TEAM_SIZE;
           const members = shuffled.slice(i, i + TEAM_SIZE);
-          teams[idx] = { name: `Team ${idx + 1}`, members };
+          teams[idx] = { name: `Team ${idx + 1}`, members, nameSet: false };
           members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
           lastIdx = idx;
         }
@@ -208,6 +223,10 @@ const gameClient = (function () {
       score: (teamIdx, delta) => r(`scores/${teamIdx}`).transaction((v) => (v || 0) + delta),
       setScore: (teamIdx, value) => r(`scores/${teamIdx}`).set(Number(value) || 0),
       reset: () => r().set({ state: freshState() }),
+      setTeamName: async (teamIdx, name) => {
+        const clean = (name || "").toString().trim().slice(0, 40);
+        await r(`teams/${teamIdx}`).update({ name: clean || `Team ${Number(teamIdx) + 1}`, nameSet: true });
+      },
       join: async (name, cb) => {
         const result = await r(`players/${name}`).transaction((p) => {
           if (!p || p.joined) return; // abort
@@ -239,6 +258,67 @@ const gameClient = (function () {
 
   let impl = null;
 
+  // Firebase stores buzzes/{key} as an object keyed by player id (since it's
+  // written via per-player transactions); LAN stores it as a plain array.
+  // This normalizes either shape into one array, sorted by timestamp, so TV
+  // and player screens never have to care which transport is active.
+  function buzzArray(s) {
+    const key = buzzKey(s);
+    const raw = s && s.buzzes && s.buzzes[key];
+    if (!raw) return [];
+    const arr = Array.isArray(raw) ? raw : Object.values(raw);
+    return arr.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  }
+
+  // Any action that fails (Firebase permission error, dropped connection,
+  // bad write, etc.) used to just do nothing visible. This wraps every
+  // state-changing call so a failure surfaces as a console error + alert
+  // instead of silently going nowhere.
+  function wrapAsync(fn, label) {
+    return (...args) => {
+      let result;
+      try {
+        result = fn(...args);
+      } catch (err) {
+        console.error(`[gameClient] ${label} failed:`, err);
+        alert(`⚠️ ${label} failed: ${(err && err.message) || err}`);
+        return;
+      }
+      if (result && typeof result.catch === "function") {
+        result.catch((err) => {
+          console.error(`[gameClient] ${label} failed:`, err);
+          alert(`⚠️ ${label} failed: ${(err && err.message) || err}`);
+        });
+      }
+      return result;
+    };
+  }
+
+  // Same idea, but for callback-style calls (join/rejoin) - if the promise
+  // rejects before the callback fires, the caller's UI would otherwise hang
+  // forever waiting on a callback that never comes. This guarantees the
+  // callback always fires.
+  function wrapCb(fn, label) {
+    return (...args) => {
+      const cb = args[args.length - 1];
+      let result;
+      try {
+        result = fn(...args);
+      } catch (err) {
+        console.error(`[gameClient] ${label} failed:`, err);
+        if (typeof cb === "function") cb({ ok: false, error: String(err) });
+        return;
+      }
+      if (result && typeof result.catch === "function") {
+        result.catch((err) => {
+          console.error(`[gameClient] ${label} failed:`, err);
+          if (typeof cb === "function") cb({ ok: false, error: String(err) });
+        });
+      }
+      return result;
+    };
+  }
+
   return {
     connect(onStatus) {
       impl = TRANSPORT === "firebase" ? initFirebase(onStatus) : initLan(onStatus);
@@ -248,21 +328,32 @@ const gameClient = (function () {
       fn(state);
     },
     buzzKey,
-    startGame: (...a) => impl.startGame(...a),
-    openLobby: (...a) => impl.openLobby(...a),
-    startQuestions: (...a) => impl.startQuestions(...a),
-    spinCategory: (...a) => impl.spinCategory(...a),
-    chooseJokerCategory: (...a) => impl.chooseJokerCategory(...a),
-    confirmCategory: (...a) => impl.confirmCategory(...a),
-    next: (...a) => impl.next(...a),
-    startTiebreaker: (...a) => impl.startTiebreaker(...a),
-    nextTiebreakQuestion: (...a) => impl.nextTiebreakQuestion(...a),
-    finishGame: (...a) => impl.finishGame(...a),
-    score: (...a) => impl.score(...a),
-    setScore: (...a) => impl.setScore(...a),
-    reset: (...a) => impl.reset(...a),
-    join: (...a) => impl.join(...a),
-    rejoin: (...a) => impl.rejoin(...a),
-    buzz: (...a) => impl.buzz(...a)
+    buzzArray: (...a) => buzzArray(...a),
+    startGame: (...a) => wrapAsync((...b) => impl.startGame(...b), "Assign teams")(...a),
+    openLobby: (...a) => wrapAsync((...b) => impl.openLobby(...b), "Show join code")(...a),
+    startQuestions: (...a) => wrapAsync((...b) => impl.startQuestions(...b), "Start questions")(...a),
+    spinCategory: (...a) => wrapAsync((...b) => impl.spinCategory(...b), "Spin wheel")(...a),
+    chooseJokerCategory: (...a) => wrapAsync((...b) => impl.chooseJokerCategory(...b), "Pick category")(...a),
+    confirmCategory: (...a) => wrapAsync((...b) => impl.confirmCategory(...b), "Continue")(...a),
+    next: (...a) => wrapAsync((...b) => impl.next(...b), "Next")(...a),
+    startTiebreaker: (...a) => wrapAsync((...b) => impl.startTiebreaker(...b), "Start tie-breaker")(...a),
+    nextTiebreakQuestion: (...a) => wrapAsync((...b) => impl.nextTiebreakQuestion(...b), "Next tie-breaker question")(...a),
+    finishGame: (...a) => wrapAsync((...b) => impl.finishGame(...b), "Finish game")(...a),
+    score: (...a) => wrapAsync((...b) => impl.score(...b), "Score update")(...a),
+    setScore: (...a) => wrapAsync((...b) => impl.setScore(...b), "Score update")(...a),
+    reset: (...a) => wrapAsync((...b) => impl.reset(...b), "Reset")(...a),
+    setTeamName: (...a) => wrapAsync((...b) => impl.setTeamName(...b), "Save team name")(...a),
+    join: (...a) => wrapCb((...b) => impl.join(...b), "Join")(...a),
+    rejoin: (...a) => wrapCb((...b) => impl.rejoin(...b), "Rejoin")(...a),
+    buzz: (...a) => {
+      try {
+        const result = impl.buzz(...a);
+        if (result && typeof result.catch === "function") {
+          result.catch((err) => console.error("[gameClient] Buzz failed:", err));
+        }
+      } catch (err) {
+        console.error("[gameClient] Buzz failed:", err);
+      }
+    }
   };
 })();

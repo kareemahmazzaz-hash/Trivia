@@ -25,6 +25,7 @@ gameClient.connect((status) => {
 
 function renderWaiting() {
   app.innerHTML = `<div class="card" style="text-align:center;"><h2>Waiting for the host to start the game...</h2></div>`;
+  lastWheelTarget = undefined; // in case this follows a reset, next game's spin should always play
 }
 
 // ---------- TEAMS REVEAL ----------
@@ -98,7 +99,7 @@ async function renderCategoryStep() {
 
   app.innerHTML = `
     ${scoreTopbar()}
-    <div class="wheel-wrap"><div class="wheel-pointer"></div><canvas id="wheel" width="360" height="360"></canvas></div>
+    <div class="wheel-wrap large"><div class="wheel-pointer"></div><canvas id="wheel" width="560" height="560"></canvas></div>
     <div class="tv-category" id="categoryLabel" style="font-size:1.6rem;">${categoryStepMessage()}</div>
   `;
   const canvas = $("#wheel");
@@ -138,8 +139,7 @@ function renderQuestionLoop() {
   const isBonus = state.step === "bonus_question" || state.step === "bonus_answer";
   const content = isBonus ? q.bonus : q;
   const showAnswer = state.step === "answer" || state.step === "bonus_answer";
-  const key = gameClient.buzzKey(state);
-  const buzzes = (state.buzzes && state.buzzes[key]) || [];
+  const buzzes = gameClient.buzzArray(state);
   const categoryLabel = state.tiebreaker ? "🏆 Tie-breaker: Politics" : CATEGORIES[state.category].label;
   const isArabic = !!content.arabic;
 

@@ -63,7 +63,7 @@ io.on("connection", (socket) => {
     for (let i = 0; i < shuffled.length; i += TEAM_SIZE) {
       const idx = i / TEAM_SIZE;
       const members = shuffled.slice(i, i + TEAM_SIZE);
-      teams[idx] = { name: `Team ${idx + 1}`, members };
+      teams[idx] = { name: `Team ${idx + 1}`, members, nameSet: false };
       members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
     }
     const scores = {};
@@ -184,6 +184,15 @@ io.on("connection", (socket) => {
 
   socket.on("host:reset", () => {
     state = freshState();
+    broadcast();
+  });
+
+  socket.on("player:setTeamName", ({ teamIdx, name }) => {
+    const t = state.teams[teamIdx];
+    if (!t) return;
+    const clean = (name || "").toString().trim().slice(0, 40);
+    t.name = clean || t.name;
+    t.nameSet = true;
     broadcast();
   });
 

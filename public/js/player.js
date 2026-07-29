@@ -6,7 +6,13 @@ let ready = false;
 function render() {
   if (!ready) return;
   if (!session) return renderJoinFlow();
+  if (needsTeamName()) return renderTeamNameFlow();
   renderBuzzerOnly();
+}
+
+function needsTeamName() {
+  const t = (state.teams || {})[session.team];
+  return !!t && !t.nameSet;
 }
 
 gameClient.onState((s) => {
@@ -71,11 +77,34 @@ function renderJoinFlow() {
   };
 }
 
-// Nothing but the buzzer once you've joined - no name, no team, no status text.
+// Shown once, right after a player joins - lets the team pick a name.
+// Reactive: as soon as ANY teammate saves a name, everyone's screen moves on.
+function renderTeamNameFlow() {
+  const t = (state.teams || {})[session.team] || {};
+  app.innerHTML = `
+    <div class="card" style="text-align:center; max-width:400px;">
+      <h2>🏷️ Name your team!</h2>
+      <p style="color:var(--muted);">You're on ${t.name || "a team"} with: ${(t.members || []).filter((n) => n !== session.name).join(", ") || "..."}</p>
+      <input id="teamNameInput" type="text" maxlength="24" placeholder="e.g. The Quiz Wizards" style="width:100%; margin-top:10px;">
+      <br><br>
+      <button id="teamNameBtn" style="width:100%;">Save Team Name</button>
+      <button id="skipTeamNameBtn" class="secondary" style="width:100%; margin-top:10px;">Keep "${t.name || ""}"</button>
+    </div>
+  `;
+  $("#teamNameBtn").onclick = () => {
+    const name = $("#teamNameInput").value.trim();
+    if (!name) { alert("Type a team name, or tap the button below to keep the default."); return; }
+    gameClient.setTeamName(session.team, name);
+  };
+  $("#skipTeamNameBtn").onclick = () => {
+    gameClient.setTeamName(session.team, t.name || "Team");
+  };
+}
+
+// Nothing but the buzzer once you've joined and named your team.
 function renderBuzzerOnly() {
   const canBuzz = state.phase === "question" && state.buzzesOpen;
-  const key = gameClient.buzzKey(state);
-  const buzzes = (state.buzzes && state.buzzes[key]) || [];
+  const buzzes = gameClient.buzzArray(state);
   const alreadyBuzzed = buzzes.some((b) => b.pid === session.pid);
   const active = canBuzz && !alreadyBuzzed;
 

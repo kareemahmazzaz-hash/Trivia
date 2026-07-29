@@ -29,8 +29,22 @@ function drawWheel(canvas, labels, rotation) {
     ctx.rotate(i * arc + arc / 2);
     ctx.textAlign = "right";
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${Math.max(12, Math.min(18, 200 / n))}px sans-serif`;
-    ctx.fillText(label, r - 14, 5);
+
+    // Text is drawn along the radius, ending near the rim (outerRadius) and
+    // reading inward. Leave a gap at the hub (innerRadius) so labels can
+    // never bleed into the center or overlap a neighboring slice there.
+    const outerRadius = r - 14;
+    const innerRadius = r * 0.22;
+    const maxTextWidth = outerRadius - innerRadius;
+
+    let fontSize = Math.max(11, Math.min(22, 240 / n));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    while (ctx.measureText(label).width > maxTextWidth && fontSize > 9) {
+      fontSize -= 1;
+      ctx.font = `bold ${fontSize}px sans-serif`;
+    }
+
+    ctx.fillText(label, outerRadius, 5);
     ctx.restore();
   });
 

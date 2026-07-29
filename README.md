@@ -115,7 +115,14 @@ question, the host can pull another one or tap **🏁 Finish Game**.
    category is used up - tap **🏆 Tie-breaker (Politics)** if needed, then
    **🏁 Finish Game** to show the final leaderboard.
 
-To start over, use **Reset Game** on the host's game-over screen.
+A **🔄 Reset Game** button sits at the top of the host screen at all times -
+tap it (any point in the game) to wipe players, teams, and scores and jump
+everyone back to name entry for a new game. Player phones detect the reset
+automatically and bounce back to the join screen.
+
+After a player claims their name, they're asked to name their team before
+the buzzer shows up - any teammate can set it, and everyone on that team
+moves on automatically once it's saved.
 
 ## Tech notes
 

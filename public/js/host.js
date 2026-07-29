@@ -1,6 +1,15 @@
 const app = $("#app");
 let state = { phase: "setup" };
 
+// Always available, regardless of game phase - resets everyone back to the
+// name-entry screen (players' stale sessions auto-clear themselves via
+// player.js's rejoin check once players/teams are wiped).
+$("#resetAllBtn").onclick = () => {
+  if (confirm("Reset the whole game? This clears players, teams, and scores, and sends everyone back to name entry.")) {
+    gameClient.reset();
+  }
+};
+
 gameClient.onState((s) => { state = s; render(); });
 gameClient.connect((status) => {
   if (status === "error") {
@@ -206,10 +215,6 @@ function renderScorePanel() {
 
 // ---------- GAME OVER ----------
 function renderGameOver() {
-  app.innerHTML = `<h2>🏁 Game Over!</h2><div class="score-panel" id="scorePanel"></div>
-    <button id="resetBtn" class="danger" style="width:100%; margin-top:16px;">Reset Game</button>`;
-  $("#resetBtn").onclick = () => {
-    if (confirm("Reset the whole game? This clears players, teams, and scores.")) gameClient.reset();
-  };
+  app.innerHTML = `<h2>🏁 Game Over!</h2><p style="color:var(--muted); text-align:center;">Tap 🔄 Reset Game up top to start a new game.</p><div class="score-panel" id="scorePanel"></div>`;
   renderScorePanel();
 }
