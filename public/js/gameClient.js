@@ -11,20 +11,11 @@ const gameClient = (function () {
 
   function freshState() {
     return {
-      phase: "setup", step: null, players: {}, teams: {}, scores: {},
+      phase: "setup", step: null, players: {}, teams: {}, scores: {}, manual: false,
       category: null, questionIndex: -1, wheelTarget: null, lastWheelTarget: null, pendingJoker: false,
       tiebreaker: false, categoryOrders: {}, categoryPointers: {},
       buzzesOpen: false, buzzes: {}
     };
-  }
-
-  function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
   }
 
   function genId() {
@@ -39,7 +30,7 @@ const gameClient = (function () {
     socket.on("state:update", (s) => { state = s; notify(); });
 
     return {
-      startGame: (names) => socket.emit("host:startGame", names),
+      startGame: (groups, manual) => socket.emit("host:startGame", { groups, manual: !!manual }),
       openLobby: () => socket.emit("host:openLobby"),
       startQuestions: () => socket.emit("host:startQuestions"),
       spinCategory: () => socket.emit("host:spinCategory"),
@@ -108,32 +99,10 @@ const gameClient = (function () {
     }
 
     return {
-      startGame: async (names) => {
-        const shuffled = shuffle(names);
-        const teams = {};
-        const players = {};
-        let lastIdx = -1;
-        for (let i = 0; i < shuffled.length; i += TEAM_SIZE) {
-          const remaining = shuffled.length - i;
-          // If what's left won't make a full team on its own, fold it into
-          // the last team we already created instead of leaving a lonely
-          // partial team behind.
-          if (remaining < TEAM_SIZE && lastIdx >= 0) {
-            const leftovers = shuffled.slice(i);
-            teams[lastIdx].members.push(...leftovers);
-            leftovers.forEach((n) => (players[n] = { team: lastIdx, joined: false, pid: null }));
-            break;
-          }
-          const idx = i / TEAM_SIZE;
-          const members = shuffled.slice(i, i + TEAM_SIZE);
-          teams[idx] = { name: `Team ${idx + 1}`, members, nameSet: false };
-          members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
-          lastIdx = idx;
-        }
-        const scores = {};
-        Object.keys(teams).forEach((idx) => (scores[idx] = 0));
+      startGame: async (groups, manual) => {
+        const { teams, players, scores } = buildTeamsFromGroups(groups);
         await r().set({
-          state: { ...freshState(), phase: "teams" },
+          state: { ...freshState(), phase: "teams", manual: !!manual },
           players, teams, scores, buzzes: null
         });
       },

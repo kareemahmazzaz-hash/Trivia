@@ -1,6 +1,7 @@
 // Edit this file before game night.
-// TEAM_SIZE * number of teams should equal the number of names below.
-const TEAM_SIZE = 2;
+// DEFAULT_NUM_TEAMS is just the number pre-filled on the setup screen -
+// the host can change it to any number of teams before assigning players.
+const DEFAULT_NUM_TEAMS = 2;
 
 const DEFAULT_PLAYER_NAMES = [
   "Mina", "Farah", "Maya", "Nabil", "Sayed",
@@ -388,16 +389,59 @@ function afterQuestion(state) {
   return { step: "category", buzzesOpen: false, resetCategory: true };
 }
 
+// ============================================================================
+// TEAM ASSIGNMENT HELPERS
+// ----------------------------------------------------------------------------
+// Shared by both the random ("wheel") and manual assignment modes, and by
+// both transports (Firebase writes teams directly; the LAN server calls
+// these too), so team-building logic only lives in one place.
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Splits `names` into `numTeams` groups as evenly as possible (round-robin),
+// with no fixed team size - any leftover players just land on different
+// teams one at a time instead of piling onto a single last team.
+function distributeEvenly(names, numTeams) {
+  const n = Math.max(1, Math.min(numTeams, names.length));
+  const groups = Array.from({ length: n }, () => []);
+  names.forEach((name, i) => groups[i % n].push(name));
+  return groups;
+}
+
+// Turns an array of member-name arrays (already decided, whether by random
+// shuffle or by the host manually assigning each player) into the
+// teams/players/scores shape the rest of the app expects. Empty groups are
+// dropped so a team nobody was assigned to doesn't show up on the TV.
+function buildTeamsFromGroups(groups) {
+  const teams = {};
+  const players = {};
+  groups.filter((g) => g && g.length).forEach((members, idx) => {
+    teams[idx] = { name: `Team ${idx + 1}`, members: [...members], nameSet: false };
+    members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
+  });
+  const scores = {};
+  Object.keys(teams).forEach((idx) => (scores[idx] = 0));
+  return { teams, players, scores };
+}
+
 // This file is loaded two ways: as a <script> tag in the browser (where it
 // just needs to define the globals above) and via require() in server.js
 // (where it needs to export them). This line makes both work.
 if (typeof module !== "undefined") {
   module.exports = {
-    TEAM_SIZE, DEFAULT_PLAYER_NAMES,
+    DEFAULT_NUM_TEAMS, DEFAULT_PLAYER_NAMES,
     CATEGORIES, WHEEL_KEYS, WHEEL_LABELS, JOKER_PICKABLE_KEYS,
     hostText, tvText,
     buildAllDrawOrders, categoryHasQuestionsLeft, availableWheelSlots,
     pickWheelTarget, drawNextQuestionIndex, currentQuestion,
-    buzzKey, computeNextStep, afterQuestion
+    buzzKey, computeNextStep, afterQuestion,
+    shuffle, distributeEvenly, buildTeamsFromGroups
   };
 }

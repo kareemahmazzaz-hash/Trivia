@@ -61,7 +61,8 @@ talk to each other changes.
 
 Edit `public/js/questions.js`:
 - `DEFAULT_PLAYER_NAMES` - your 10 players (or type them into the host screen
-  on the night). `TEAM_SIZE` controls players per team.
+  on the night). The number of teams and how many players end up on each one
+  is no longer fixed - the host picks it on the setup screen (see below).
 - `CATEGORIES` - an object keyed by category (`geography`, `history`,
   `science`, `sports`, `math`, `general`, `politics`), each with a `label`
   and 10 `questions`. Each question has:
@@ -101,8 +102,12 @@ question, the host can pull another one or tap **🏁 Finish Game**.
 ## Running the game
 
 1. **TV**: open the app.
-2. **Host**: review/edit the 10 names, tap **Assign Teams** - the TV plays the
-   team-picking wheel.
+2. **Host**: review/edit the player names, set the **number of teams**, and
+   choose how teams get assigned:
+   - **🎡 Random (wheel)** - tap **Assign Teams** and the TV plays the
+     team-picking wheel.
+   - **✋ Manual** - tap **Next: Place Players**, use the dropdowns to put
+     each player on whichever team you want, then tap **Confirm Teams**.
 3. Tap **Next: Show Join QR Code**. Players scan it and tap their own name.
 4. Tap **Start Questions**.
 5. Each round: tap **Spin the Category Wheel** (the TV animates it), then

@@ -4,8 +4,9 @@ const os = require("os");
 const path = require("path");
 const { Server } = require("socket.io");
 const {
-  TEAM_SIZE, WHEEL_KEYS, buzzKey, computeNextStep,
-  buildAllDrawOrders, drawNextQuestionIndex, pickWheelTarget
+  WHEEL_KEYS, buzzKey, computeNextStep,
+  buildAllDrawOrders, drawNextQuestionIndex, pickWheelTarget,
+  buildTeamsFromGroups
 } = require("./public/js/questions.js");
 
 const app = express();
@@ -21,6 +22,7 @@ function freshState() {
     players: {},           // name -> { team, joined, pid }
     teams: {},              // idx -> { name, members: [] }
     scores: {},             // idx -> number
+    manual: false,          // true if the host hand-picked teams instead of the random wheel
     category: null,         // current wheel category key ("geography", ... or "politics" for tie-breaker)
     questionIndex: -1,      // index into CATEGORIES[category].questions
     wheelTarget: null,      // wheel slot index (0-6) the TV should spin to
@@ -40,15 +42,6 @@ function broadcast() {
   io.emit("state:update", state);
 }
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
 function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -56,20 +49,14 @@ function genId() {
 io.on("connection", (socket) => {
   socket.emit("state:update", state);
 
-  socket.on("host:startGame", (names) => {
-    if (!Array.isArray(names) || !names.length || names.length % TEAM_SIZE !== 0) return;
-    const shuffled = shuffle(names);
-    const teams = {};
-    const players = {};
-    for (let i = 0; i < shuffled.length; i += TEAM_SIZE) {
-      const idx = i / TEAM_SIZE;
-      const members = shuffled.slice(i, i + TEAM_SIZE);
-      teams[idx] = { name: `Team ${idx + 1}`, members, nameSet: false };
-      members.forEach((n) => (players[n] = { team: idx, joined: false, pid: null }));
-    }
-    const scores = {};
-    Object.keys(teams).forEach((idx) => (scores[idx] = 0));
-    state = { ...freshState(), phase: "teams", players, teams, scores };
+  socket.on("host:startGame", ({ groups, manual } = {}) => {
+    if (!Array.isArray(groups) || !groups.length) return;
+    const cleanGroups = groups
+      .map((g) => (Array.isArray(g) ? g.map((n) => String(n || "").trim()).filter(Boolean) : []))
+      .filter((g) => g.length);
+    if (!cleanGroups.length) return;
+    const { teams, players, scores } = buildTeamsFromGroups(cleanGroups);
+    state = { ...freshState(), phase: "teams", manual: !!manual, players, teams, scores };
     broadcast();
   });
 

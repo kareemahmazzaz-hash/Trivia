@@ -1,6 +1,12 @@
 const app = $("#app");
 let state = { phase: "setup" };
 
+// Local-only UI state for the manual "host places each player" step. This
+// never touches gameClient/Firebase/Socket - it's just scratch state while
+// the host is deciding, until they hit "Confirm Teams" and it turns into a
+// groups array passed to gameClient.startGame().
+let manualDraft = null; // { names, numTeams, teamOf: { [name]: teamIdx } }
+
 // Always available, regardless of game phase - resets everyone back to the
 // name-entry screen (players' stale sessions auto-clear themselves via
 // player.js's rejoin check once players/teams are wiped).
@@ -18,8 +24,9 @@ gameClient.connect((status) => {
 });
 
 function render() {
+  if (state.phase !== "setup") manualDraft = null; // leaving setup clears any in-progress manual draft
   switch (state.phase) {
-    case "setup": return renderSetup();
+    case "setup": return manualDraft ? renderManualAssign() : renderSetup();
     case "teams": return renderTeams();
     case "lobby": return renderLobby();
     case "question": return renderQuestionPhase();
@@ -29,20 +36,103 @@ function render() {
 }
 
 // ---------- SETUP ----------
+// Keeps whatever the host typed/picked last time this render happened, so
+// re-renders (or toggling the mode) don't wipe out their in-progress input.
+let setupDraft = { names: null, numTeams: DEFAULT_NUM_TEAMS, mode: "random" };
+
 function renderSetup() {
+  const namesValue = setupDraft.names ?? DEFAULT_PLAYER_NAMES.join("\n");
   app.innerHTML = `
     <h2>Set up players</h2>
-    <p style="color:var(--muted)">One name per line. Teams of ${TEAM_SIZE} — any leftover players join the last team.</p>
-    <textarea id="names" rows="10" style="width:100%;">${DEFAULT_PLAYER_NAMES.join("\n")}</textarea>
-    <button id="startBtn" style="width:100%; margin-top:14px;">🎡 Assign Teams</button>
+    <p style="color:var(--muted)">One name per line. Any number of players and teams.</p>
+    <textarea id="names" rows="10" style="width:100%;">${namesValue}</textarea>
+
+    <label style="display:block; margin-top:14px; color:var(--muted);">Number of teams</label>
+    <input id="numTeams" type="number" min="1" value="${setupDraft.numTeams}" style="width:100%;">
+
+    <label style="display:block; margin-top:14px; color:var(--muted);">Team assignment</label>
+    <div style="display:flex; gap:10px;">
+      <button id="modeRandom" class="${setupDraft.mode === "random" ? "" : "secondary"}" style="flex:1;">🎡 Random (wheel)</button>
+      <button id="modeManual" class="${setupDraft.mode === "manual" ? "" : "secondary"}" style="flex:1;">✋ Manual</button>
+    </div>
+
+    <button id="startBtn" style="width:100%; margin-top:14px;">
+      ${setupDraft.mode === "manual" ? "Next: Place Players →" : "🎡 Assign Teams"}
+    </button>
   `;
+
+  $("#modeRandom").onclick = () => { syncSetupDraft(); setupDraft.mode = "random"; renderSetup(); };
+  $("#modeManual").onclick = () => { syncSetupDraft(); setupDraft.mode = "manual"; renderSetup(); };
+
   $("#startBtn").onclick = () => {
-    const names = $("#names").value.split("\n").map((n) => n.trim()).filter(Boolean);
-    if (names.length < TEAM_SIZE) {
-      alert(`Need at least ${TEAM_SIZE} players.`);
+    syncSetupDraft();
+    const names = setupDraft.names.split("\n").map((n) => n.trim()).filter(Boolean);
+    const numTeams = Math.max(1, Math.floor(Number(setupDraft.numTeams)) || 1);
+    if (!names.length) {
+      alert("Add at least one player.");
       return;
     }
-    gameClient.startGame(names);
+    if (names.length < numTeams) {
+      alert(`You have ${numTeams} teams but only ${names.length} player(s). Add more players or lower the team count.`);
+      return;
+    }
+
+    if (setupDraft.mode === "manual") {
+      // Pre-fill with the same even split as random mode, so the host is
+      // just nudging people between teams rather than starting from blank.
+      const groups = distributeEvenly(names, numTeams);
+      const teamOf = {};
+      groups.forEach((members, idx) => members.forEach((n) => (teamOf[n] = idx)));
+      manualDraft = { names, numTeams, teamOf };
+      renderManualAssign();
+    } else {
+      const groups = distributeEvenly(shuffle(names), numTeams);
+      gameClient.startGame(groups, false);
+    }
+  };
+}
+
+function syncSetupDraft() {
+  const namesEl = $("#names");
+  const numTeamsEl = $("#numTeams");
+  if (namesEl) setupDraft.names = namesEl.value;
+  if (numTeamsEl) setupDraft.numTeams = numTeamsEl.value;
+}
+
+// ---------- MANUAL TEAM ASSIGNMENT ----------
+function renderManualAssign() {
+  const { names, numTeams, teamOf } = manualDraft;
+  const teamOptions = Array.from({ length: numTeams }, (_, i) => i);
+
+  app.innerHTML = `
+    <h2>✋ Place each player</h2>
+    <p style="color:var(--muted)">Pick a team for everyone, then confirm.</p>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${names.map((name) => `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="flex:1;">${name}</div>
+          <select data-name="${name}" style="flex:1;">
+            ${teamOptions.map((idx) => `<option value="${idx}" ${teamOf[name] === idx ? "selected" : ""}>Team ${idx + 1}</option>`).join("")}
+          </select>
+        </div>
+      `).join("")}
+    </div>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button id="backBtn" class="secondary" style="flex:1;">← Back</button>
+      <button id="confirmBtn" style="flex:1;">🎉 Confirm Teams</button>
+    </div>
+  `;
+
+  app.querySelectorAll("select[data-name]").forEach((sel) => {
+    sel.onchange = () => { manualDraft.teamOf[sel.dataset.name] = Number(sel.value); };
+  });
+
+  $("#backBtn").onclick = () => { manualDraft = null; render(); };
+  $("#confirmBtn").onclick = () => {
+    const groups = Array.from({ length: numTeams }, () => []);
+    names.forEach((name) => groups[manualDraft.teamOf[name]].push(name));
+    gameClient.startGame(groups, true);
+    manualDraft = null;
   };
 }
 

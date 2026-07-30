@@ -32,9 +32,10 @@ function renderWaiting() {
 async function playTeamsReveal() {
   const players = state.players || {};
   const teams = state.teams || {};
+  const manual = !!state.manual; // host hand-picked teams - nothing to "reveal", so skip the wheel
 
   app.innerHTML = `
-    <div class="wheel-wrap"><div class="wheel-pointer"></div><canvas id="wheel" width="340" height="340"></canvas></div>
+    ${manual ? "" : `<div class="wheel-wrap"><div class="wheel-pointer"></div><canvas id="wheel" width="340" height="340"></canvas></div>`}
     <div class="team-grid" id="teamGrid"></div>
   `;
   const teamIdxs = Object.keys(teams);
@@ -46,21 +47,23 @@ async function playTeamsReveal() {
   teamIdxs.forEach((idx) => teams[idx].members.forEach((name) => order.push({ name, idx })));
 
   let remaining = Object.keys(players);
-  const canvas = $("#wheel");
+  const canvas = manual ? null : $("#wheel");
   for (const step of order) {
-    const target = remaining.indexOf(step.name);
-    // With 2 (or 1) names left there's nothing left to "reveal" - spinning a
-    // wheel with only one or two slices is pointless and looks broken, so
-    // just place the rest without animating.
-    if (remaining.length > 2) {
-      await spinWheelAsync(canvas, remaining, target);
+    if (!manual) {
+      const target = remaining.indexOf(step.name);
+      // With 2 (or 1) names left there's nothing left to "reveal" - spinning
+      // a wheel with only one or two slices is pointless and looks broken,
+      // so just place the rest without animating.
+      if (remaining.length > 2) {
+        await spinWheelAsync(canvas, remaining, target);
+      }
+      remaining.splice(target, 1);
     }
     const slot = document.createElement("div");
     slot.className = "member";
     slot.textContent = step.name;
     $(`#team-${step.idx}`).appendChild(slot);
-    remaining.splice(target, 1);
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, manual ? 250 : 400));
   }
 }
 
