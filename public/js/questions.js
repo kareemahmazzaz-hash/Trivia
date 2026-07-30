@@ -3,8 +3,8 @@
 const TEAM_SIZE = 2;
 
 const DEFAULT_PLAYER_NAMES = [
-  "Mohamed", "Yahya", "Tante", "Amo", "Mama",
-  "Amto", "Samia", "Hayat", "Baba", "Zahra"
+  "Mina", "Farah", "Maya", "Nabil", "Sayed",
+  "Noor", "Sara", "Emara", "Dai", "Sabry"
 ];
 
 // ============================================================================
@@ -95,7 +95,7 @@ const CATEGORIES = {
     questions: [
       {
         text: "What is the chemical symbol for Germanium?",
-        franko: "Eh el chemical symbol le 2ny element?",
+        franko: "Eh el chemical symbol le Germanium?",
         answer: "Ge",
         bonus: { text: "In which country was it discovered?", franko: "El ektshafo mn 2ny dawla?", answer: "Germany" }
       },
