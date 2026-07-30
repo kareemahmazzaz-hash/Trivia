@@ -7,6 +7,13 @@ let state = { phase: "setup" };
 // groups array passed to gameClient.startGame().
 let manualDraft = null; // { names, numTeams, teamOf: { [name]: teamIdx } }
 
+// Keeps whatever the host typed/picked on the setup screen, so re-renders
+// (or toggling the mode) don't wipe out their in-progress input. Declared
+// up here - not down by renderSetup() - because gameClient.onState() below
+// calls render() synchronously the moment it's registered, so this needs to
+// already be initialized before that first render happens.
+let setupDraft = { names: null, numTeams: DEFAULT_NUM_TEAMS, mode: "random" };
+
 // Always available, regardless of game phase - resets everyone back to the
 // name-entry screen (players' stale sessions auto-clear themselves via
 // player.js's rejoin check once players/teams are wiped).
@@ -36,10 +43,6 @@ function render() {
 }
 
 // ---------- SETUP ----------
-// Keeps whatever the host typed/picked last time this render happened, so
-// re-renders (or toggling the mode) don't wipe out their in-progress input.
-let setupDraft = { names: null, numTeams: DEFAULT_NUM_TEAMS, mode: "random" };
-
 function renderSetup() {
   const namesValue = setupDraft.names ?? DEFAULT_PLAYER_NAMES.join("\n");
   app.innerHTML = `
