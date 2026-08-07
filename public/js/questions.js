@@ -4,8 +4,8 @@
 const DEFAULT_NUM_TEAMS = 2;
 
 const DEFAULT_PLAYER_NAMES = [
-  "Mina", "Farah", "Maya", "Nabil", "Sayed",
-  "Noor", "Sara", "Emara", "Dai", "Sabry"
+  "Yehya", "Zahra", "Hayat", "Samia", "Mohammed",
+  "Skeena", "Ramy", "Mayada", "Madeha", "Ahmed"
 ];
 
 // ============================================================================
