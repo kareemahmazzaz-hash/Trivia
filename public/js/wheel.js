@@ -1,7 +1,7 @@
 // A generic spinning wheel. It always knows the target index in advance
 // (the "randomness" already happened in gameClient) - this just makes a
 // satisfying animation that lands on that known answer.
-const WHEEL_COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#8338ec", "#fb5607", "#3a86ff", "#2ec4b6", "#ff9f1c", "#e63946"];
+const WHEEL_COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#8338ec", "#fb5607", "#3a86ff", "#2ec4b6", "#ff9f1c", "#e63946", "#4361ee"];
 
 function drawWheel(canvas, labels, rotation) {
   const ctx = canvas.getContext("2d");
