@@ -55,7 +55,12 @@ function spinWheelAsync(canvas, labels, targetIndex, duration = 3200) {
   return new Promise((resolve) => {
     const n = labels.length;
     const arc = (2 * Math.PI) / n;
-    const targetAngle = -(targetIndex * arc + arc / 2) - Math.PI / 2;
+    // Land somewhere within the slice, not dead-center every time (keeps a
+    // safety margin from the slice edges so it never looks like it clipped
+    // into the neighboring slice).
+    const maxJitter = arc * 0.35;
+    const jitter = (Math.random() * 2 - 1) * maxJitter;
+    const targetAngle = -(targetIndex * arc + arc / 2 + jitter) - Math.PI / 2;
     const fullSpins = 5;
     const finalRotation = fullSpins * 2 * Math.PI + targetAngle;
     const start = performance.now();
