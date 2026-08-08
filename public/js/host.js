@@ -5,7 +5,7 @@ let state = { phase: "setup" };
 // never touches gameClient/Firebase/Socket - it's just scratch state while
 // the host is deciding, until they hit "Confirm Teams" and it turns into a
 // groups array passed to gameClient.startGame().
-let manualDraft = null; // { names, numTeams, teamOf: { [name]: teamIdx } }
+let manualDraft = null; // { names, numTeams, teamOf: { [name]: teamIdx }, fakeSpin }
 
 // Keeps whatever the host typed/picked on the setup screen, so re-renders
 // (or toggling the mode) don't wipe out their in-progress input. Declared
@@ -54,18 +54,21 @@ function renderSetup() {
     <input id="numTeams" type="number" min="1" value="${setupDraft.numTeams}" style="width:100%;">
 
     <label style="display:block; margin-top:14px; color:var(--muted);">Team assignment</label>
-    <div style="display:flex; gap:10px;">
-      <button id="modeRandom" class="${setupDraft.mode === "random" ? "" : "secondary"}" style="flex:1;">🎡 Random (wheel)</button>
-      <button id="modeManual" class="${setupDraft.mode === "manual" ? "" : "secondary"}" style="flex:1;">✋ Manual</button>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button id="modeRandom" class="${setupDraft.mode === "random" ? "" : "secondary"}" style="width:100%;">🎡 Random (wheel)</button>
+      <button id="modeManual" class="${setupDraft.mode === "manual" ? "" : "secondary"}" style="width:100%;">✋ Manual</button>
+      <button id="modeManualFake" class="${setupDraft.mode === "manualFake" ? "" : "secondary"}" style="width:100%;">🎭 Manual + Fake Spin</button>
     </div>
+    ${setupDraft.mode === "manualFake" ? `<p style="color:var(--muted); font-size:0.9em;">You pick the teams, but the TV still plays the full randomized wheel reveal - the audience can't tell it was rigged.</p>` : ""}
 
     <button id="startBtn" style="width:100%; margin-top:14px;">
-      ${setupDraft.mode === "manual" ? "Next: Place Players →" : "🎡 Assign Teams"}
+      ${setupDraft.mode === "random" ? "🎡 Assign Teams" : "Next: Place Players →"}
     </button>
   `;
 
   $("#modeRandom").onclick = () => { syncSetupDraft(); setupDraft.mode = "random"; renderSetup(); };
   $("#modeManual").onclick = () => { syncSetupDraft(); setupDraft.mode = "manual"; renderSetup(); };
+  $("#modeManualFake").onclick = () => { syncSetupDraft(); setupDraft.mode = "manualFake"; renderSetup(); };
 
   $("#startBtn").onclick = () => {
     syncSetupDraft();
@@ -80,13 +83,13 @@ function renderSetup() {
       return;
     }
 
-    if (setupDraft.mode === "manual") {
+    if (setupDraft.mode === "manual" || setupDraft.mode === "manualFake") {
       // Pre-fill with the same even split as random mode, so the host is
       // just nudging people between teams rather than starting from blank.
       const groups = distributeEvenly(names, numTeams);
       const teamOf = {};
       groups.forEach((members, idx) => members.forEach((n) => (teamOf[n] = idx)));
-      manualDraft = { names, numTeams, teamOf };
+      manualDraft = { names, numTeams, teamOf, fakeSpin: setupDraft.mode === "manualFake" };
       renderManualAssign();
     } else {
       const groups = distributeEvenly(shuffle(names), numTeams);
@@ -104,12 +107,12 @@ function syncSetupDraft() {
 
 // ---------- MANUAL TEAM ASSIGNMENT ----------
 function renderManualAssign() {
-  const { names, numTeams, teamOf } = manualDraft;
+  const { names, numTeams, teamOf, fakeSpin } = manualDraft;
   const teamOptions = Array.from({ length: numTeams }, (_, i) => i);
 
   app.innerHTML = `
-    <h2>✋ Place each player</h2>
-    <p style="color:var(--muted)">Pick a team for everyone, then confirm.</p>
+    <h2>${fakeSpin ? "🎭 Place each player" : "✋ Place each player"}</h2>
+    <p style="color:var(--muted)">${fakeSpin ? "Pick a team for everyone. The TV will still \"spin\" to reveal them - nobody will know it's rigged." : "Pick a team for everyone, then confirm."}</p>
     <div style="display:flex; flex-direction:column; gap:8px;">
       ${names.map((name) => `
         <div style="display:flex; align-items:center; gap:10px;">
@@ -134,7 +137,9 @@ function renderManualAssign() {
   $("#confirmBtn").onclick = () => {
     const groups = Array.from({ length: numTeams }, () => []);
     names.forEach((name) => groups[manualDraft.teamOf[name]].push(name));
-    gameClient.startGame(groups, true);
+    // fakeSpin: pass manual=false so tv.js plays the full randomized wheel
+    // reveal even though the groups were actually hand-picked by the host.
+    gameClient.startGame(groups, !manualDraft.fakeSpin);
     manualDraft = null;
   };
 }
