@@ -248,7 +248,7 @@ const CATEGORIES = {
         text: "Who was the Chief of Staff during the October War, before \"the Gap\" (the Israeli crossing)?",
         franko: "Meen kan ra2ees el arkan f 7arb october abl el sa8ra?",
         arabic: "مين كان رئيس الأركان في حرب أكتوبر قبل الثغرة؟",
-        answer: "Saad El Shazly",
+        answer: "Saad El Din El Shazly",
         bonus: { text: "Why did Sadat remove him?", franko: "El sadat masha leh?", arabic: "السادات مشّاه ليه؟", answer: "(host's call — no fixed answer recorded)" }
       },
       { text: "How many articles does the Egyptian constitution contain?", franko: "El dostoor el masry fe kam mada?", arabic: "الدستور المصري فيه كام مادة؟", answer: "254" },
@@ -339,7 +339,7 @@ const CATEGORIES = {
         answer: "Once, in Surah At-Tahrim (verse 7)",
         bonus: { text: "How many times does \"O you who believe\" appear?", franko: "يَا أَيُّهَا الَّذِينَ آمَنُوا kam mara?", arabic: "\"يَا أَيُّهَا الَّذِينَ آمَنُوا\" اتذكرت كام مرة؟", answer: "89 times" }
       },
-      { text: "On what occasion was the verse about the setback after a previous double victory revealed (Aal-Imran 165)?", franko: "El aya de nzlet f 2ny monasba?", arabic: "متى نزلت آية \"أَوَلَمَّا أَصَابَتْكُم مُّصِيبَةٌ...\"؟", answer: "The Battle of Uhud (Aal-Imran 165)" },
+      { text: "On what occasion was the verse about the setback after a previous double victory revealed (Aal-Imran 165)?", franko: "El aya de nzlet f 2ny monasba?", arabic: "\"أَوَلَمَّا أَصَابَتْكُم مُّصِيبَةٌ قَدْ أَصَبْتُم مِّثْلَيْهَا قُلْتُمْ أَنَّىٰ هَٰذَا ۖ قُلْ هُوَ مِنْ عِندِ أَنفُسِكُمْ ۗ إِنَّ اللَّهَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ\"، نزلت في أي مناسبة؟", answer: "The Battle of Uhud (Aal-Imran 165)" },
       { text: "What are people called whose good and bad deeds are equal on Judgment Day?", franko: "El nas el 7asanatthom w say2athom beytsawo youm el qeyama beytsamo eh?", arabic: "الناس اللي حسناتهم وسيئاتهم بتتساوى يوم القيامة بيتسموا إيه؟", answer: "Ahl Al-A'raf (People of the Heights)" },
       {
         text: "Which are more numerous: Meccan or Medinan surahs?",
@@ -387,7 +387,7 @@ const CATEGORIES = {
         text: "The 'Umrah performed after the Treaty of Hudaybiyyah had a few names — what were they?",
         franko: "3omret el qada2 el kanet ba3d sol7 el 7odaybeya kan leha kaza esm eh homa?",
         arabic: "عمرة القضاء اللي كانت بعد صلح الحديبية كان ليها كذا اسم، إيه هما؟",
-        answer: "Umrat Al-Qada / Umrat Al-Sulh / Umrat Al-Qadiyyah",
+        answer: "Umrat Al-Qasas / Umrat Al-Sulh / Umrat Al-Qadiyyah",
         bonus: { text: "Why was it called \"Umrat Al-Qasas\" (retribution)?", franko: "Leh someyat 3omret el qesas?", arabic: "ليه سُمّيت عمرة القصاص؟", answer: "Because the Prophet ﷺ waited until the following year and performed the 'Umrah in the same month (Dhu Al-Qi'dah) he had been turned away in" }
       },
       { text: "Who took part in washing the Prophet's ﷺ body?", franko: "Meen sharek fe 8osl el rasool?", arabic: "مين شارك في غسل الرسول ﷺ؟", answer: "Ali ibn Abi Talib, Al-Abbas ibn Abd Al-Muttalib, Al-Fadl ibn Al-Abbas, Usama ibn Zayd, Qutham ibn Al-Abbas, and Shuqran" }
