@@ -515,7 +515,7 @@ function computeNextStep(state) {
 
   if (state.step === "answer") {
     const q = currentQuestion(state);
-    if (q && q.bonus) return { step: "bonus_question", buzzesOpen: true, clearBuzz: true };
+    if (q && q.bonus) return { step: "bonus_question", buzzesOpen: false, clearBuzz: true };
     return afterQuestion(state);
   }
 

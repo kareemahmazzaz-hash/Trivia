@@ -9,12 +9,20 @@ const gameClient = (function () {
     listeners.forEach((fn) => fn(state));
   }
 
+  // How long (ms) the current top buzzer has to be judged before their buzz
+  // auto-expires and the next-in-line becomes the new top buzzer.
+  const BUZZ_TIMEOUT_MS = 10000;
+
   function freshState() {
     return {
       phase: "setup", step: null, players: {}, teams: {}, scores: {}, manual: false,
       category: null, questionIndex: -1, wheelTarget: null, lastWheelTarget: null, pendingJoker: false,
       tiebreaker: false, categoryOrders: {}, categoryPointers: {},
-      buzzesOpen: false, buzzes: {}
+      buzzesOpen: false, buzzes: {},
+      // Buzzers stay closed after a question is shown until the host taps
+      // "🔔 Buzzers". buzzExpireAt/buzzTopPid track the 10s elimination
+      // countdown for whichever buzz is currently first in line.
+      buzzExpireAt: null, buzzTopPid: null
     };
   }
 
@@ -46,7 +54,10 @@ const gameClient = (function () {
       setTeamName: (teamIdx, name) => socket.emit("player:setTeamName", { teamIdx, name }),
       join: (name, cb) => socket.emit("player:join", { name }, cb),
       rejoin: (name, pid, cb) => socket.emit("player:rejoin", { name, pid }, cb),
-      buzz: (name, pid) => socket.emit("player:buzz", { name, pid })
+      buzz: (name, pid) => socket.emit("player:buzz", { name, pid }),
+      openBuzzers: () => socket.emit("host:openBuzzers"),
+      startBuzzTimer: (pid) => socket.emit("host:startBuzzTimer", { pid }),
+      expireBuzz: (pid) => socket.emit("host:expireBuzz", { pid })
     };
   }
 
@@ -115,7 +126,7 @@ const gameClient = (function () {
           phase: "question", step: "category",
           category: null, questionIndex: -1, wheelTarget: null, pendingJoker: false,
           tiebreaker: false, categoryOrders, categoryPointers: {},
-          buzzesOpen: false
+          buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null
         });
       },
 
@@ -139,11 +150,13 @@ const gameClient = (function () {
       },
 
       // Host confirms the chosen category: draws the next question from it.
+      // Buzzers stay CLOSED here - the host has to tap "🔔 Buzzers" once
+      // they've finished reading the question aloud.
       confirmCategory: async () => {
         if (!state.category) return;
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, state.category);
         const updates = {
-          step: "question", questionIndex, buzzesOpen: true,
+          step: "question", questionIndex, buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
           [`categoryPointers/${state.category}`]: nextPointer
         };
         await r("state").update(updates);
@@ -153,7 +166,7 @@ const gameClient = (function () {
       next: async () => {
         const result = computeNextStep(state);
         if (!result) return;
-        const updates = { step: result.step, buzzesOpen: result.buzzesOpen };
+        const updates = { step: result.step, buzzesOpen: result.buzzesOpen, buzzExpireAt: null, buzzTopPid: null };
         if (result.resetCategory) {
           updates.category = null;
           updates.questionIndex = -1;
@@ -169,7 +182,8 @@ const gameClient = (function () {
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
         const updates = {
           tiebreaker: true, category: "politics", questionIndex,
-          step: "question", buzzesOpen: true, wheelTarget: null, pendingJoker: false,
+          step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
+          wheelTarget: null, pendingJoker: false,
           "categoryPointers/politics": nextPointer
         };
         await r("state").update(updates);
@@ -179,15 +193,36 @@ const gameClient = (function () {
       nextTiebreakQuestion: async () => {
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
         const updates = {
-          questionIndex, step: "question", buzzesOpen: true,
+          questionIndex, step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
           "categoryPointers/politics": nextPointer
         };
         await r("state").update(updates);
         await clearBuzzFor({ ...state, category: "politics", questionIndex, step: "question" });
       },
 
+      // Host taps "🔔 Buzzers" once ready - only THEN can players buzz in.
+      openBuzzers: async () => {
+        await r("state").update({ buzzesOpen: true, buzzExpireAt: null, buzzTopPid: null });
+      },
+
+      // Starts (or restarts) the 10s elimination countdown for whichever
+      // buzz is now first in line.
+      startBuzzTimer: async (pid) => {
+        await r("state").update({ buzzExpireAt: Date.now() + BUZZ_TIMEOUT_MS, buzzTopPid: pid });
+      },
+
+      // The current top buzzer ran out of time: mark their buzz as expired
+      // (so their name drops off the list and they can't buzz again - the
+      // record itself stays so a re-buzz is still blocked) and clear the
+      // timer so the host's next tick starts a fresh 10s for whoever's next.
+      expireBuzz: async (pid) => {
+        const key = buzzKey(state);
+        await r(`buzzes/${key}/${pid}`).update({ expired: true });
+        await r("state").update({ buzzExpireAt: null, buzzTopPid: null });
+      },
+
       finishGame: async () => {
-        await r("state").update({ phase: "gameover", buzzesOpen: false });
+        await r("state").update({ phase: "gameover", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null });
       },
 
       score: (teamIdx, delta) => r(`scores/${teamIdx}`).transaction((v) => (v || 0) + delta),
@@ -238,6 +273,13 @@ const gameClient = (function () {
     if (!raw) return [];
     const arr = Array.isArray(raw) ? raw : Object.values(raw);
     return arr.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  }
+
+  // Same as buzzArray, but drops anyone whose 10s window already ran out -
+  // this is what the TV/host "who's up" list should render, since expired
+  // buzzers disappear from the queue (though they still can't re-buzz).
+  function activeBuzzArray(s) {
+    return buzzArray(s).filter((b) => !b.expired);
   }
 
   // Any action that fails (Firebase permission error, dropped connection,
@@ -299,6 +341,8 @@ const gameClient = (function () {
     },
     buzzKey,
     buzzArray: (...a) => buzzArray(...a),
+    activeBuzzArray: (...a) => activeBuzzArray(...a),
+    BUZZ_TIMEOUT_MS,
     startGame: (...a) => wrapAsync((...b) => impl.startGame(...b), "Assign teams")(...a),
     openLobby: (...a) => wrapAsync((...b) => impl.openLobby(...b), "Show join code")(...a),
     startQuestions: (...a) => wrapAsync((...b) => impl.startQuestions(...b), "Start questions")(...a),
@@ -309,6 +353,9 @@ const gameClient = (function () {
     startTiebreaker: (...a) => wrapAsync((...b) => impl.startTiebreaker(...b), "Start tie-breaker")(...a),
     nextTiebreakQuestion: (...a) => wrapAsync((...b) => impl.nextTiebreakQuestion(...b), "Next tie-breaker question")(...a),
     finishGame: (...a) => wrapAsync((...b) => impl.finishGame(...b), "Finish game")(...a),
+    openBuzzers: (...a) => wrapAsync((...b) => impl.openBuzzers(...b), "Open buzzers")(...a),
+    startBuzzTimer: (...a) => wrapAsync((...b) => impl.startBuzzTimer(...b), "Start buzz timer")(...a),
+    expireBuzz: (...a) => wrapAsync((...b) => impl.expireBuzz(...b), "Expire buzz")(...a),
     score: (...a) => wrapAsync((...b) => impl.score(...b), "Score update")(...a),
     setScore: (...a) => wrapAsync((...b) => impl.setScore(...b), "Score update")(...a),
     reset: (...a) => wrapAsync((...b) => impl.reset(...b), "Reset")(...a),

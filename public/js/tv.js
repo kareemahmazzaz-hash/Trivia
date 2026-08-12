@@ -149,7 +149,10 @@ function renderQuestionLoop() {
   const isBonus = state.step === "bonus_question" || state.step === "bonus_answer";
   const content = isBonus ? q.bonus : q;
   const showAnswer = state.step === "answer" || state.step === "bonus_answer";
-  const buzzes = gameClient.buzzArray(state);
+  // Buzzers only show up (and the countdown only runs) while it's still up
+  // for grabs. Expired buzzes drop off the list entirely.
+  const buzzableStep = state.step === "question" || state.step === "bonus_question";
+  const buzzes = gameClient.activeBuzzArray(state);
   const categoryLabel = state.tiebreaker ? "🏆 Tie-breaker: Politics" : CATEGORIES[state.category].label;
   const isArabic = !!content.arabic;
 
@@ -164,10 +167,31 @@ function renderQuestionLoop() {
       </div>
       <div class="tv-buzz-col">
         <h3>Buzz Order</h3>
-        <ol class="buzz-list">${buzzes.map((b, i) => `<li><span>#${i + 1} ${b.name}</span><span>${b.team}</span></li>`).join("")}</ol>
+        ${buzzableStep && !state.buzzesOpen
+          ? `<p style="color:var(--muted); font-size:0.95rem;">🔔 Waiting for host...</p>`
+          : `<ol class="buzz-list">${buzzes.map((b, i) => `
+              <li><span>#${i + 1} ${b.name}</span><span>${i === 0 && buzzableStep ? `<span id="buzzCountdown">10s</span> · ` : ""}${b.team}</span></li>
+            `).join("")}</ol>`
+        }
       </div>
     </div>
   `;
+
+  if (buzzableStep && state.buzzesOpen && buzzes.length) startBuzzCountdownDisplay();
+}
+
+// Ticks the "#buzzCountdown" text every 250ms without a full re-render, so
+// the TV shows the 10s elimination window counting down live.
+let buzzCountdownInterval = null;
+function startBuzzCountdownDisplay() {
+  if (buzzCountdownInterval) clearInterval(buzzCountdownInterval);
+  buzzCountdownInterval = setInterval(() => {
+    const el = document.getElementById("buzzCountdown");
+    if (!el) return;
+    if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
+    const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
+    el.textContent = `${remaining}s`;
+  }, 250);
 }
 
 // ---------- TIE-BREAKER "what next" STEP ----------

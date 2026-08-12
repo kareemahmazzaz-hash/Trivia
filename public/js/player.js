@@ -105,12 +105,14 @@ function renderTeamNameFlow() {
 function renderBuzzerOnly() {
   const canBuzz = state.phase === "question" && state.buzzesOpen;
   const buzzes = gameClient.buzzArray(state);
-  const alreadyBuzzed = buzzes.some((b) => b.pid === session.pid);
+  const myBuzz = buzzes.find((b) => b.pid === session.pid);
+  const alreadyBuzzed = !!myBuzz;
   const active = canBuzz && !alreadyBuzzed;
+  const label = myBuzz ? (myBuzz.expired ? "✗" : "✓") : "BUZZ";
 
   app.innerHTML = `
     <div class="player-screen">
-      <button id="buzzBtn" class="buzz-button" ${active ? "" : "disabled"}>${alreadyBuzzed ? "✓" : "BUZZ"}</button>
+      <button id="buzzBtn" class="buzz-button" ${active ? "" : "disabled"}>${label}</button>
     </div>
   `;
   if (active) {

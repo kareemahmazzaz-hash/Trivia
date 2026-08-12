@@ -24,6 +24,40 @@ $("#resetAllBtn").onclick = () => {
 };
 
 gameClient.onState((s) => { state = s; render(); });
+
+// ---------- BUZZ ELIMINATION TIMER ----------
+// Runs continuously on the host (the single source of truth for game flow).
+// While buzzers are open on a question/bonus step, the first name in line
+// gets BUZZ_TIMEOUT_MS to be judged. If the host hasn't moved on by then,
+// that buzz is marked expired - it drops off the list and can't buzz again
+// - and the next name in line becomes first, with a fresh countdown.
+let pendingBuzzAction = null; // guards against re-sending a call while waiting for state to confirm it
+setInterval(() => {
+  const inBuzzableStep = state.phase === "question" && (state.step === "question" || state.step === "bonus_question");
+  if (!inBuzzableStep || !state.buzzesOpen) { pendingBuzzAction = null; return; }
+
+  const active = gameClient.activeBuzzArray(state);
+  if (!active.length) { pendingBuzzAction = null; return; }
+
+  const top = active[0];
+  if (state.buzzTopPid !== top.pid) {
+    const tag = `start:${top.pid}`;
+    if (pendingBuzzAction !== tag) {
+      pendingBuzzAction = tag;
+      gameClient.startBuzzTimer(top.pid);
+    }
+    return;
+  }
+  pendingBuzzAction = null;
+  if (state.buzzExpireAt && Date.now() >= state.buzzExpireAt) {
+    const tag = `expire:${top.pid}`;
+    if (pendingBuzzAction !== tag) {
+      pendingBuzzAction = tag;
+      gameClient.expireBuzz(top.pid);
+    }
+  }
+}, 300);
+
 gameClient.connect((status) => {
   if (status === "error") {
     app.innerHTML = `<h2>⚠️ Can't reach the server</h2><p style="color:var(--muted)">${TRANSPORT === "firebase" ? "Check your internet connection and firebase-config.js." : "Make sure your phone is on the same WiFi as the computer running the server."}</p>`;
@@ -247,6 +281,9 @@ function renderQuestionLoop() {
   const isBonus = state.step === "bonus_question" || state.step === "bonus_answer";
   const content = isBonus ? q.bonus : q;
   const categoryLabel = state.tiebreaker ? "🏆 Tie-breaker: Politics" : CATEGORIES[state.category].label;
+  // Buzzers only matter while the question is up for grabs, before the
+  // answer's revealed.
+  const buzzableStep = state.step === "question" || state.step === "bonus_question";
 
   let nextLabel;
   if (state.step === "question") nextLabel = "🔒 Lock & Reveal Answer";
@@ -260,11 +297,56 @@ function renderQuestionLoop() {
     <p style="font-size:1.3rem; font-weight:700;">${hostText(content)}</p>
     ${content.note ? `<p style="color:var(--muted); font-style:italic;">📝 ${content.note}</p>` : ""}
     <p style="color:var(--accent2); font-size:1.15rem;"><strong>Answer:</strong> ${content.answer}</p>
+    ${buzzableStep ? renderBuzzControls() : ""}
     <button id="nextBtn" style="width:100%; margin-top:6px;">${nextLabel}</button>
     <div class="score-panel" id="scorePanel" style="margin-top:20px;"></div>
   `;
   $("#nextBtn").onclick = () => gameClient.next();
+
+  if (buzzableStep) {
+    const buzzersBtn = $("#buzzersBtn");
+    if (buzzersBtn) buzzersBtn.onclick = () => gameClient.openBuzzers();
+    startBuzzCountdownDisplay();
+  }
+
   renderScorePanel();
+}
+
+// ---------- BUZZ PANEL (host view) ----------
+function renderBuzzControls() {
+  if (!state.buzzesOpen) {
+    return `<button id="buzzersBtn" style="width:100%; margin-top:10px;">🔔 Buzzers</button>`;
+  }
+  const active = gameClient.activeBuzzArray(state);
+  if (!active.length) {
+    return `<div class="buzz-host-panel"><p style="color:var(--muted); text-align:center; margin:10px 0;">🔔 Buzzers open - waiting for the first buzz...</p></div>`;
+  }
+  return `
+    <div class="buzz-host-panel">
+      <ol class="buzz-list">
+        ${active.map((b, i) => `
+          <li>
+            <span>#${i + 1} ${b.name} <span style="opacity:0.7">(${b.team})</span></span>
+            ${i === 0 ? `<span id="buzzCountdown">10s</span>` : ""}
+          </li>
+        `).join("")}
+      </ol>
+    </div>
+  `;
+}
+
+// Ticks the "#buzzCountdown" text every 250ms without a full re-render, so
+// the host sees the 10s window counting down live on the top buzzer.
+let buzzCountdownInterval = null;
+function startBuzzCountdownDisplay() {
+  if (buzzCountdownInterval) clearInterval(buzzCountdownInterval);
+  buzzCountdownInterval = setInterval(() => {
+    const el = document.getElementById("buzzCountdown");
+    if (!el) return;
+    if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
+    const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
+    el.textContent = `${remaining}s`;
+  }, 250);
 }
 
 // ---------- TIE-BREAKER "what next" STEP ----------
