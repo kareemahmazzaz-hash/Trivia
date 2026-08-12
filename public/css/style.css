@@ -142,6 +142,13 @@ input, select, textarea {
 .buzz-list li:first-child { border: 2px solid var(--accent2); color: var(--accent2); }
 @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+#buzzCountdown {
+  display: inline-block; min-width: 34px; text-align: center;
+  background: var(--accent2); color: #10112a; border-radius: 999px;
+  padding: 2px 8px; font-weight: 800; font-size: 0.95rem;
+}
+.buzz-host-panel { margin-top: 12px; width: 100%; }
+
 /* ---------- Player buzz button (only thing shown) ---------- */
 .player-screen { display: flex; align-items: center; justify-content: center; min-height: 70vh; width: 100%; }
 .buzz-button {
