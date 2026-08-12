@@ -32,9 +32,13 @@ function freshState() {
     categoryOrders: {},     // categoryKey -> shuffled draw order (built once at startQuestions)
     categoryPointers: {},   // categoryKey -> how many questions already drawn from it
     buzzesOpen: false,
-    buzzes: {}              // buzzKey -> [{ name, team, pid, ts }]
+    buzzes: {},              // buzzKey -> [{ name, team, pid, ts, expired }]
+    buzzExpireAt: null,      // epoch ms - when the current top buzzer's 10s window ends
+    buzzTopPid: null         // pid the countdown above belongs to
   };
 }
+
+const BUZZ_TIMEOUT_MS = 10000;
 
 let state = freshState();
 
@@ -76,6 +80,8 @@ io.on("connection", (socket) => {
     state.categoryOrders = buildAllDrawOrders();
     state.categoryPointers = {};
     state.buzzesOpen = false;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     broadcast();
   });
 
@@ -101,13 +107,17 @@ io.on("connection", (socket) => {
   });
 
   // Host confirms the chosen category: draws the next question from it.
+  // Buzzers stay CLOSED here - the host has to tap "🔔 Buzzers" once
+  // they've finished reading the question aloud.
   socket.on("host:confirmCategory", () => {
     if (!state.category) return;
     const { questionIndex, nextPointer } = drawNextQuestionIndex(state, state.category);
     state.questionIndex = questionIndex;
     state.categoryPointers[state.category] = nextPointer;
     state.step = "question";
-    state.buzzesOpen = true;
+    state.buzzesOpen = false;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     state.buzzes[buzzKey(state)] = [];
     broadcast();
   });
@@ -117,6 +127,8 @@ io.on("connection", (socket) => {
     if (!result) return;
     state.step = result.step;
     state.buzzesOpen = result.buzzesOpen;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     if (result.resetCategory) {
       state.category = null;
       state.questionIndex = -1;
@@ -136,7 +148,9 @@ io.on("connection", (socket) => {
     state.questionIndex = questionIndex;
     state.categoryPointers.politics = nextPointer;
     state.step = "question";
-    state.buzzesOpen = true;
+    state.buzzesOpen = false;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     state.wheelTarget = null;
     state.pendingJoker = false;
     state.buzzes[buzzKey(state)] = [];
@@ -148,14 +162,49 @@ io.on("connection", (socket) => {
     state.questionIndex = questionIndex;
     state.categoryPointers.politics = nextPointer;
     state.step = "question";
-    state.buzzesOpen = true;
+    state.buzzesOpen = false;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     state.buzzes[buzzKey(state)] = [];
+    broadcast();
+  });
+
+  // Host taps "🔔 Buzzers" once ready - only THEN can players buzz in.
+  socket.on("host:openBuzzers", () => {
+    state.buzzesOpen = true;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
+    broadcast();
+  });
+
+  // Starts (or restarts) the 10s elimination countdown for whichever buzz
+  // is now first in line.
+  socket.on("host:startBuzzTimer", ({ pid } = {}) => {
+    if (!pid) return;
+    state.buzzExpireAt = Date.now() + BUZZ_TIMEOUT_MS;
+    state.buzzTopPid = pid;
+    broadcast();
+  });
+
+  // The current top buzzer ran out of time: mark their buzz expired (drops
+  // off the list, but the record stays so they can't re-buzz) and clear the
+  // timer so the host's next tick starts a fresh 10s for whoever's next.
+  socket.on("host:expireBuzz", ({ pid } = {}) => {
+    if (!pid) return;
+    const key = buzzKey(state);
+    const list = state.buzzes[key];
+    const entry = list && list.find((b) => b.pid === pid);
+    if (entry) entry.expired = true;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     broadcast();
   });
 
   socket.on("host:finishGame", () => {
     state.phase = "gameover";
     state.buzzesOpen = false;
+    state.buzzExpireAt = null;
+    state.buzzTopPid = null;
     broadcast();
   });
 
