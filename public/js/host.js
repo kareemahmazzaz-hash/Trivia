@@ -213,7 +213,6 @@ function renderQuestionPhase() {
 
 // ---------- CATEGORY WHEEL STEP ----------
 function renderCategoryStep() {
-  const politicsLeft = categoryHasQuestionsLeft(state, "politics");
   const wheelExhausted = availableWheelSlots(state).length === 0;
 
   let body;
@@ -248,7 +247,6 @@ function renderCategoryStep() {
   app.innerHTML = `
     ${body}
     <div style="display:flex; gap:10px; margin-top:16px; width:100%;">
-      <button id="tiebreakBtn" class="secondary" style="flex:1;" ${politicsLeft ? "" : "disabled"}>🏆 Tie-breaker (Politics)</button>
       <button id="finishBtn" class="danger" style="flex:1;">🏁 Finish Game</button>
     </div>
     <div class="score-panel" id="scorePanel" style="margin-top:20px;"></div>
@@ -264,9 +262,6 @@ function renderCategoryStep() {
     btn.onclick = () => gameClient.chooseJokerCategory(btn.dataset.key);
   });
 
-  $("#tiebreakBtn").onclick = () => {
-    if (confirm("Start the tie-breaker? This switches to Politics questions.")) gameClient.startTiebreaker();
-  };
   $("#finishBtn").onclick = () => {
     if (confirm("Finish the game now?")) gameClient.finishGame();
   };
@@ -306,7 +301,6 @@ function renderQuestionLoop() {
   if (buzzableStep) {
     const buzzersBtn = $("#buzzersBtn");
     if (buzzersBtn) buzzersBtn.onclick = () => gameClient.openBuzzers();
-    startBuzzCountdownDisplay();
   }
 
   renderScorePanel();
@@ -337,17 +331,16 @@ function renderBuzzControls() {
 
 // Ticks the "#buzzCountdown" text every 250ms without a full re-render, so
 // the host sees the 10s window counting down live on the top buzzer.
-let buzzCountdownInterval = null;
-function startBuzzCountdownDisplay() {
-  if (buzzCountdownInterval) clearInterval(buzzCountdownInterval);
-  buzzCountdownInterval = setInterval(() => {
-    const el = document.getElementById("buzzCountdown");
-    if (!el) return;
-    if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
-    const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
-    el.textContent = `${remaining}s`;
-  }, 250);
-}
+// Runs continuously (started once below) rather than being restarted on
+// every render, so a burst of state updates while the queue advances to
+// the next buzzer can't repeatedly reset the interval before it ever fires.
+setInterval(() => {
+  const el = document.getElementById("buzzCountdown");
+  if (!el) return;
+  if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
+  const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
+  el.textContent = `${remaining}s`;
+}, 250);
 
 // ---------- TIE-BREAKER "what next" STEP ----------
 function renderTiebreakDone() {
