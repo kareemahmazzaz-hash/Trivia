@@ -70,7 +70,7 @@ setInterval(() => {
   const stillActive = active.some((b) => b.pid === state.buzzTopPid);
   if (!stillActive) { pendingBuzzAction = null; return; }
 
-  if (state.buzzExpireAt && Date.now() >= state.buzzExpireAt) {
+  if (state.buzzExpireAt && gameClient.serverNow() >= state.buzzExpireAt) {
     const tag = `expire:${state.buzzTopPid}`;
     if (pendingBuzzAction !== tag) {
       pendingBuzzAction = tag;
@@ -366,7 +366,7 @@ setInterval(() => {
   const el = document.getElementById("buzzCountdown");
   if (!el) return;
   if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
-  const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
+  const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - gameClient.serverNow()) / 1000));
   el.textContent = `${remaining}s`;
 }, 250);
 

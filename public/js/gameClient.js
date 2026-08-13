@@ -5,6 +5,24 @@ const gameClient = (function () {
   let listeners = [];
   let state = { phase: "setup" };
 
+  // Firebase clock skew fix: buzzExpireAt is written by whichever device
+  // called startBuzzTimer/expireBuzz (the host), then read back and diffed
+  // against Date.now() on OTHER devices (TV, host itself) to render the
+  // countdown. If a device's own clock is off from the others' by even a
+  // couple seconds, the countdown shows a wrong starting number (e.g. "12s"
+  // instead of "10s") purely from clock drift, not any real delay. Firebase
+  // exposes ".info/serverTimeOffset" - the gap between this device's clock
+  // and Firebase's server clock - specifically to correct for this. serverNow()
+  // below is Date.now() adjusted by that offset, and every write/read of
+  // buzzExpireAt uses it instead of raw Date.now(), so all devices agree on
+  // "now" regardless of how their own system clocks are set. On LAN
+  // (Socket.IO) there's no such offset concept - all devices talk to the same
+  // local server directly - so serverTimeOffset just stays 0 there.
+  let serverTimeOffset = 0;
+  function serverNow() {
+    return Date.now() + serverTimeOffset;
+  }
+
   function notify() {
     listeners.forEach((fn) => fn(state));
   }
@@ -72,6 +90,12 @@ const gameClient = (function () {
     db.ref(".info/connected").on("value", (snap) => {
       if (snap.val() === true) { connectedOnce = true; onStatus && onStatus("connected"); }
       else if (connectedOnce) onStatus && onStatus("error");
+    });
+
+    // Keep serverTimeOffset in sync with Firebase's clock for as long as
+    // we're connected, so serverNow() stays accurate on this device.
+    db.ref(".info/serverTimeOffset").on("value", (snap) => {
+      serverTimeOffset = snap.val() || 0;
     });
 
     // Every write triggers multiple "value" listeners (state/players/teams/
@@ -208,7 +232,7 @@ const gameClient = (function () {
       // Starts (or restarts) the 10s elimination countdown for whichever
       // buzz is now first in line.
       startBuzzTimer: async (pid) => {
-        await r("state").update({ buzzExpireAt: Date.now() + BUZZ_TIMEOUT_MS, buzzTopPid: pid });
+        await r("state").update({ buzzExpireAt: serverNow() + BUZZ_TIMEOUT_MS, buzzTopPid: pid });
       },
 
       // The current top buzzer ran out of time: mark their buzz as expired
@@ -229,7 +253,7 @@ const gameClient = (function () {
         const next = remaining[0] || null;
         await r().update({
           [`buzzes/${key}/${pid}/expired`]: true,
-          "state/buzzExpireAt": next ? Date.now() + BUZZ_TIMEOUT_MS : null,
+          "state/buzzExpireAt": next ? serverNow() + BUZZ_TIMEOUT_MS : null,
           "state/buzzTopPid": next ? next.pid : null
         });
       },
@@ -356,6 +380,7 @@ const gameClient = (function () {
     buzzArray: (...a) => buzzArray(...a),
     activeBuzzArray: (...a) => activeBuzzArray(...a),
     BUZZ_TIMEOUT_MS,
+    serverNow,
     startGame: (...a) => wrapAsync((...b) => impl.startGame(...b), "Assign teams")(...a),
     openLobby: (...a) => wrapAsync((...b) => impl.openLobby(...b), "Show join code")(...a),
     startQuestions: (...a) => wrapAsync((...b) => impl.startQuestions(...b), "Start questions")(...a),
