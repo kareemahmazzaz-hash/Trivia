@@ -54,6 +54,15 @@ setInterval(() => {
   // Only the expire hand-off below is allowed to advance to the next
   // buzzer once someone is locked in.
   if (!state.buzzTopPid) {
+    // If a buzzer just expired, buzzDelayUntil holds off starting the next
+    // buzzer's countdown until the TV's "wrong buzzer" sound effect has
+    // finished playing (BUZZ_WRONG_SOUND_MS) - so the next 10s doesn't start
+    // ticking underneath it. Not set on the very first buzz of a question,
+    // so that one starts immediately.
+    if (state.buzzDelayUntil && gameClient.serverNow() < state.buzzDelayUntil) {
+      pendingBuzzAction = null;
+      return;
+    }
     const top = active[0];
     const tag = `start:${top.pid}`;
     if (pendingBuzzAction !== tag) {

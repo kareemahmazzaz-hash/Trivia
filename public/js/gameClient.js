@@ -31,6 +31,13 @@ const gameClient = (function () {
   // auto-expires and the next-in-line becomes the new top buzzer.
   const BUZZ_TIMEOUT_MS = 10000;
 
+  // How long (ms) the TV's "big buzzer" wrong-answer sound effect takes to
+  // play out. When a buzzer's 10s runs out, the next-in-line's countdown is
+  // held off for this same duration, so nobody's fresh 10s starts ticking
+  // underneath the buzzer sound. Keep this in sync with the matching
+  // constant in server.js (LAN path) and tv.js (where the sound is played).
+  const BUZZ_WRONG_SOUND_MS = 1500;
+
   function freshState() {
     return {
       phase: "setup", step: null, players: {}, teams: {}, scores: {}, manual: false,
@@ -39,8 +46,11 @@ const gameClient = (function () {
       buzzesOpen: false, buzzes: {},
       // Buzzers stay closed after a question is shown until the host taps
       // "🔔 Buzzers". buzzExpireAt/buzzTopPid track the 10s elimination
-      // countdown for whichever buzz is currently first in line.
-      buzzExpireAt: null, buzzTopPid: null
+      // countdown for whichever buzz is currently first in line. buzzDelayUntil
+      // is set for BUZZ_WRONG_SOUND_MS after a buzz expires, so the host's
+      // loop holds off starting the next buzzer's timer until the "wrong"
+      // sound effect has finished playing on the TV.
+      buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null
     };
   }
 
@@ -150,7 +160,7 @@ const gameClient = (function () {
           phase: "question", step: "category",
           category: null, questionIndex: -1, wheelTarget: null, pendingJoker: false,
           tiebreaker: false, categoryOrders, categoryPointers: {},
-          buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null
+          buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null
         });
       },
 
@@ -180,7 +190,7 @@ const gameClient = (function () {
         if (!state.category) return;
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, state.category);
         const updates = {
-          step: "question", questionIndex, buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
+          step: "question", questionIndex, buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null,
           [`categoryPointers/${state.category}`]: nextPointer
         };
         await r("state").update(updates);
@@ -190,7 +200,7 @@ const gameClient = (function () {
       next: async () => {
         const result = computeNextStep(state);
         if (!result) return;
-        const updates = { step: result.step, buzzesOpen: result.buzzesOpen, buzzExpireAt: null, buzzTopPid: null };
+        const updates = { step: result.step, buzzesOpen: result.buzzesOpen, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null };
         if (result.resetCategory) {
           updates.category = null;
           updates.questionIndex = -1;
@@ -206,7 +216,7 @@ const gameClient = (function () {
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
         const updates = {
           tiebreaker: true, category: "politics", questionIndex,
-          step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
+          step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null,
           wheelTarget: null, pendingJoker: false,
           "categoryPointers/politics": nextPointer
         };
@@ -217,7 +227,7 @@ const gameClient = (function () {
       nextTiebreakQuestion: async () => {
         const { questionIndex, nextPointer } = drawNextQuestionIndex(state, "politics");
         const updates = {
-          questionIndex, step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null,
+          questionIndex, step: "question", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null,
           "categoryPointers/politics": nextPointer
         };
         await r("state").update(updates);
@@ -226,40 +236,35 @@ const gameClient = (function () {
 
       // Host taps "🔔 Buzzers" once ready - only THEN can players buzz in.
       openBuzzers: async () => {
-        await r("state").update({ buzzesOpen: true, buzzExpireAt: null, buzzTopPid: null });
+        await r("state").update({ buzzesOpen: true, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null });
       },
 
       // Starts (or restarts) the 10s elimination countdown for whichever
-      // buzz is now first in line.
+      // buzz is now first in line. Also clears buzzDelayUntil - we're past
+      // the post-expiry delay now that a fresh timer is starting.
       startBuzzTimer: async (pid) => {
-        await r("state").update({ buzzExpireAt: serverNow() + BUZZ_TIMEOUT_MS, buzzTopPid: pid });
+        await r("state").update({ buzzExpireAt: serverNow() + BUZZ_TIMEOUT_MS, buzzTopPid: pid, buzzDelayUntil: null });
       },
 
       // The current top buzzer ran out of time: mark their buzz as expired
       // (so their name drops off the list and they can't buzz again - the
-      // record itself stays so a re-buzz is still blocked) and clear the
-      // timer so the host's next tick starts a fresh 10s for whoever's next.
-      // The current top buzzer ran out of time: mark their buzz as expired
-      // (so their name drops off the list and they can't buzz again - the
-      // record itself stays so a re-buzz is still blocked). Rather than just
-      // clearing buzzTopPid/buzzExpireAt and waiting for the next poll tick
-      // to notice and start the next buzzer's timer (which left a gap where
-      // stale writes could clobber things), this computes the next buzzer
-      // in line right now and hands the timer off to them in the SAME
-      // atomic write - no gap, no separate round trip.
+      // record itself stays so a re-buzz is still blocked), clear the timer,
+      // and set buzzDelayUntil so the host's loop waits out the TV's "wrong
+      // buzzer" sound effect before starting the next buzzer's fresh 10s -
+      // see BUZZ_WRONG_SOUND_MS above. The loop (host.js) is what actually
+      // hands the timer to the next buzzer once that delay passes.
       expireBuzz: async (pid) => {
         const key = buzzKey(state);
-        const remaining = buzzArray(state).filter((b) => !b.expired && b.pid !== pid);
-        const next = remaining[0] || null;
         await r().update({
           [`buzzes/${key}/${pid}/expired`]: true,
-          "state/buzzExpireAt": next ? serverNow() + BUZZ_TIMEOUT_MS : null,
-          "state/buzzTopPid": next ? next.pid : null
+          "state/buzzExpireAt": null,
+          "state/buzzTopPid": null,
+          "state/buzzDelayUntil": serverNow() + BUZZ_WRONG_SOUND_MS
         });
       },
 
       finishGame: async () => {
-        await r("state").update({ phase: "gameover", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null });
+        await r("state").update({ phase: "gameover", buzzesOpen: false, buzzExpireAt: null, buzzTopPid: null, buzzDelayUntil: null });
       },
 
       score: (teamIdx, delta) => r(`scores/${teamIdx}`).transaction((v) => (v || 0) + delta),
@@ -380,6 +385,7 @@ const gameClient = (function () {
     buzzArray: (...a) => buzzArray(...a),
     activeBuzzArray: (...a) => activeBuzzArray(...a),
     BUZZ_TIMEOUT_MS,
+    BUZZ_WRONG_SOUND_MS,
     serverNow,
     startGame: (...a) => wrapAsync((...b) => impl.startGame(...b), "Assign teams")(...a),
     openLobby: (...a) => wrapAsync((...b) => impl.openLobby(...b), "Show join code")(...a),

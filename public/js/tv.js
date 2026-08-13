@@ -167,6 +167,7 @@ function renderQuestionLoop() {
       </div>
       <div class="tv-buzz-col">
         <h3>Buzz Order</h3>
+        <p id="buzzWrongMsg" style="color:#ff5a5a; font-weight:800; min-height:1.3em; margin:2px 0 8px;"></p>
         ${buzzableStep && !state.buzzesOpen
           ? `<p style="color:var(--muted); font-size:0.95rem;">🔔 Waiting for host...</p>`
           : `<ol class="buzz-list">${buzzes.map((b, i) => `
@@ -179,6 +180,65 @@ function renderQuestionLoop() {
 
 }
 
+// ---------- SOUND EFFECTS ----------
+// Synthesized with the Web Audio API so no external sound files are needed.
+// Browsers block audio until a user gesture happens somewhere on the page,
+// so the AudioContext is created/resumed lazily on first click/tap/keypress.
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+["click", "touchstart", "keydown"].forEach((evt) =>
+  document.addEventListener(evt, () => getAudioCtx(), { once: true })
+);
+
+// Short high beep on every second of the countdown ticking down.
+function playTickBeep() {
+  const ctx = getAudioCtx();
+  const t0 = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.13);
+}
+
+// Big descending "wrong buzzer" sound when the 10s runs out. Its length
+// MUST match BUZZ_WRONG_SOUND_MS in gameClient.js/server.js, since the host
+// holds off the next buzzer's timer for exactly this long.
+const BUZZ_WRONG_SOUND_MS = 1500;
+function playBuzzerWrong() {
+  const ctx = getAudioCtx();
+  const t0 = ctx.currentTime;
+  const dur = BUZZ_WRONG_SOUND_MS / 1000;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.4, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  gain.connect(ctx.destination);
+
+  const osc1 = ctx.createOscillator();
+  osc1.type = "sawtooth";
+  osc1.frequency.setValueAtTime(180, t0);
+  osc1.frequency.exponentialRampToValueAtTime(70, t0 + dur);
+
+  const osc2 = ctx.createOscillator();
+  osc2.type = "square";
+  osc2.frequency.setValueAtTime(150, t0);
+  osc2.frequency.exponentialRampToValueAtTime(55, t0 + dur);
+
+  osc1.connect(gain);
+  osc2.connect(gain);
+  osc1.start(t0); osc2.start(t0);
+  osc1.stop(t0 + dur); osc2.stop(t0 + dur);
+}
+
 // Ticks the "#buzzCountdown" text every 250ms. Started ONCE below, at file
 // scope, rather than restarted from inside renderQuestionLoop() - state
 // updates unrelated to the buzz (score, buzzesOpen toggles, a new buzzer
@@ -189,12 +249,35 @@ function renderQuestionLoop() {
 // right when someone buzzed in. A single continuous interval - mirroring how
 // host.js already does this - just polls whatever #buzzCountdown element
 // currently exists in the DOM, so it keeps ticking smoothly across renders.
+let lastBuzzTopPid = null;
+let lastTickSecond = null;
+let wrongSoundPlayedFor = null; // tracks which buzzDelayUntil value we've already played the sound for
 setInterval(() => {
+  // A buzzer's turn just ended (buzzTopPid went from set to null) and the
+  // host set a fresh buzzDelayUntil for it - play the big wrong-buzzer sound
+  // exactly once for this expiry.
+  if (lastBuzzTopPid && !state.buzzTopPid && state.buzzDelayUntil && wrongSoundPlayedFor !== state.buzzDelayUntil) {
+    wrongSoundPlayedFor = state.buzzDelayUntil;
+    playBuzzerWrong();
+  }
+  lastBuzzTopPid = state.buzzTopPid;
+
+  const msgEl = document.getElementById("buzzWrongMsg");
+  if (msgEl) {
+    msgEl.textContent = (state.buzzDelayUntil && gameClient.serverNow() < state.buzzDelayUntil) ? "❌ Wrong! Next buzzer..." : "";
+  }
+
   const el = document.getElementById("buzzCountdown");
-  if (!el) return;
-  if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
+  if (!el) { lastTickSecond = null; return; }
+  if (!state.buzzExpireAt || !state.buzzTopPid) { el.textContent = "10s"; lastTickSecond = null; return; }
+
   const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - gameClient.serverNow()) / 1000));
   el.textContent = `${remaining}s`;
+
+  if (remaining !== lastTickSecond) {
+    lastTickSecond = remaining;
+    if (remaining > 0) playTickBeep();
+  }
 }, 250);
 
 // ---------- TIE-BREAKER "what next" STEP ----------
