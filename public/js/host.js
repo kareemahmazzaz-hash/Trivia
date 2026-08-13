@@ -48,13 +48,19 @@ setInterval(() => {
     }
     return;
   }
-  pendingBuzzAction = null;
   if (state.buzzExpireAt && Date.now() >= state.buzzExpireAt) {
     const tag = `expire:${top.pid}`;
     if (pendingBuzzAction !== tag) {
       pendingBuzzAction = tag;
       gameClient.expireBuzz(top.pid);
     }
+  } else {
+    // Only clear the guard while we're NOT mid-expiry - if we reset it every
+    // tick (even while waiting on Firebase to confirm an expire we already
+    // sent), a slow round-trip lets this loop re-send expireBuzz for the
+    // same buzzer multiple times, each one able to clobber the next
+    // buzzer's freshly-started timer back to null.
+    pendingBuzzAction = null;
   }
 }, 300);
 

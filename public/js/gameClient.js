@@ -217,8 +217,16 @@ const gameClient = (function () {
       // timer so the host's next tick starts a fresh 10s for whoever's next.
       expireBuzz: async (pid) => {
         const key = buzzKey(state);
-        await r(`buzzes/${key}/${pid}`).update({ expired: true });
-        await r("state").update({ buzzExpireAt: null, buzzTopPid: null });
+        // Single atomic multi-path write instead of two sequential updates -
+        // otherwise the host's polling loop can see the buzz already marked
+        // expired but buzzTopPid/buzzExpireAt not yet cleared, start the next
+        // buzzer's timer, and then have this call's second write land after
+        // and clobber that fresh timer back to null.
+        await r().update({
+          [`buzzes/${key}/${pid}/expired`]: true,
+          "state/buzzExpireAt": null,
+          "state/buzzTopPid": null
+        });
       },
 
       finishGame: async () => {
