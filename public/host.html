@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trivia Night - Host</title>
 <link rel="stylesheet" href="css/style.css">
-<script src="js/config.js?v=202608130929"></script>
+<script src="js/config.js?v=202608131015"></script>
 <script>
   // Load the right transport script(s) before anything else runs.
   (TRANSPORT === "firebase"
     ? ["https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
        "https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js",
-       "js/firebase-config.js?v=202608130929"]
+       "js/firebase-config.js?v=202608131015"]
     : ["/socket.io/socket.io.js"]
   ).forEach((src) => document.write(`<script src="${src}"><\/script>`));
 </script>
@@ -25,9 +25,9 @@
     <div id="app" class="card"></div>
   </div>
 
-  <script src="js/utils.js?v=202608130929"></script>
-  <script src="js/questions.js?v=202608130929"></script>
-  <script src="js/gameClient.js?v=202608130929"></script>
-  <script src="js/host.js?v=202608130929"></script>
+  <script src="js/utils.js?v=202608131015"></script>
+  <script src="js/questions.js?v=202608131015"></script>
+  <script src="js/gameClient.js?v=202608131015"></script>
+  <script src="js/host.js?v=202608131015"></script>
 </body>
 </html>
