@@ -39,8 +39,22 @@ setInterval(() => {
   const active = gameClient.activeBuzzArray(state);
   if (!active.length) { pendingBuzzAction = null; return; }
 
-  const top = active[0];
-  if (state.buzzTopPid !== top.pid) {
+  // Nobody's countdown is running yet - lock onto whichever buzz is
+  // currently first and start their timer.
+  //
+  // IMPORTANT: once locked (buzzTopPid is set), this loop must NEVER
+  // re-evaluate "who's first" again. When several people buzz within the
+  // same instant, their writes can sync to this device out of order - a
+  // buzzer whose write reaches Firebase a moment later can still carry an
+  // earlier server timestamp than one that already synced. If we kept
+  // comparing against active[0] every tick, that kind of re-sort would
+  // look like "the top buzzer changed" and re-trigger startBuzzTimer over
+  // and over, which resets the 10s countdown back to full each time -
+  // exactly the "frozen at 10s" symptom during simultaneous buzz-ins.
+  // Only the expire hand-off below is allowed to advance to the next
+  // buzzer once someone is locked in.
+  if (!state.buzzTopPid) {
+    const top = active[0];
     const tag = `start:${top.pid}`;
     if (pendingBuzzAction !== tag) {
       pendingBuzzAction = tag;
@@ -48,11 +62,19 @@ setInterval(() => {
     }
     return;
   }
+
+  // Safety net: if the locked-in buzzer somehow isn't in the active list
+  // anymore (e.g. expired via another path) but a stale buzzTopPid is
+  // still hanging around, just wait for state to catch up rather than
+  // guessing at a replacement.
+  const stillActive = active.some((b) => b.pid === state.buzzTopPid);
+  if (!stillActive) { pendingBuzzAction = null; return; }
+
   if (state.buzzExpireAt && Date.now() >= state.buzzExpireAt) {
-    const tag = `expire:${top.pid}`;
+    const tag = `expire:${state.buzzTopPid}`;
     if (pendingBuzzAction !== tag) {
       pendingBuzzAction = tag;
-      gameClient.expireBuzz(top.pid);
+      gameClient.expireBuzz(state.buzzTopPid);
     }
   } else {
     // Only clear the guard while we're NOT mid-expiry - if we reset it every
@@ -327,7 +349,7 @@ function renderBuzzControls() {
         ${active.map((b, i) => `
           <li>
             <span>#${i + 1} ${b.name} <span style="opacity:0.7">(${b.team})</span></span>
-            ${i === 0 ? `<span id="buzzCountdown">10s</span>` : ""}
+            ${b.pid === state.buzzTopPid ? `<span id="buzzCountdown">10s</span>` : ""}
           </li>
         `).join("")}
       </ol>

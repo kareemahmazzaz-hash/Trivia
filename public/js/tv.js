@@ -170,7 +170,7 @@ function renderQuestionLoop() {
         ${buzzableStep && !state.buzzesOpen
           ? `<p style="color:var(--muted); font-size:0.95rem;">🔔 Waiting for host...</p>`
           : `<ol class="buzz-list">${buzzes.map((b, i) => `
-              <li><span>#${i + 1} ${b.name}</span><span>${i === 0 && buzzableStep ? `<span id="buzzCountdown">10s</span> · ` : ""}${b.team}</span></li>
+              <li><span>#${i + 1} ${b.name}</span><span>${buzzableStep && b.pid === state.buzzTopPid ? `<span id="buzzCountdown">10s</span> · ` : ""}${b.team}</span></li>
             `).join("")}</ol>`
         }
       </div>
