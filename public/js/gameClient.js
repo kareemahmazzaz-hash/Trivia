@@ -215,17 +215,22 @@ const gameClient = (function () {
       // (so their name drops off the list and they can't buzz again - the
       // record itself stays so a re-buzz is still blocked) and clear the
       // timer so the host's next tick starts a fresh 10s for whoever's next.
+      // The current top buzzer ran out of time: mark their buzz as expired
+      // (so their name drops off the list and they can't buzz again - the
+      // record itself stays so a re-buzz is still blocked). Rather than just
+      // clearing buzzTopPid/buzzExpireAt and waiting for the next poll tick
+      // to notice and start the next buzzer's timer (which left a gap where
+      // stale writes could clobber things), this computes the next buzzer
+      // in line right now and hands the timer off to them in the SAME
+      // atomic write - no gap, no separate round trip.
       expireBuzz: async (pid) => {
         const key = buzzKey(state);
-        // Single atomic multi-path write instead of two sequential updates -
-        // otherwise the host's polling loop can see the buzz already marked
-        // expired but buzzTopPid/buzzExpireAt not yet cleared, start the next
-        // buzzer's timer, and then have this call's second write land after
-        // and clobber that fresh timer back to null.
+        const remaining = buzzArray(state).filter((b) => !b.expired && b.pid !== pid);
+        const next = remaining[0] || null;
         await r().update({
           [`buzzes/${key}/${pid}/expired`]: true,
-          "state/buzzExpireAt": null,
-          "state/buzzTopPid": null
+          "state/buzzExpireAt": next ? Date.now() + BUZZ_TIMEOUT_MS : null,
+          "state/buzzTopPid": next ? next.pid : null
         });
       },
 
