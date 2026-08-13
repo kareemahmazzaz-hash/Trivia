@@ -34,11 +34,17 @@ function freshState() {
     buzzesOpen: false,
     buzzes: {},              // buzzKey -> [{ name, team, pid, ts, expired }]
     buzzExpireAt: null,      // epoch ms - when the current top buzzer's 10s window ends
-    buzzTopPid: null         // pid the countdown above belongs to
+    buzzTopPid: null,        // pid the countdown above belongs to
+    buzzDelayUntil: null     // epoch ms - holds off the next buzzer's timer until the TV's "wrong buzzer" sound finishes
   };
 }
 
 const BUZZ_TIMEOUT_MS = 10000;
+
+// How long (ms) the TV's "big buzzer" wrong-answer sound effect takes to
+// play out. Keep in sync with the matching constant in public/js/gameClient.js
+// and public/js/tv.js.
+const BUZZ_WRONG_SOUND_MS = 1500;
 
 let state = freshState();
 
@@ -82,6 +88,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = false;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     broadcast();
   });
 
@@ -118,6 +125,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = false;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     state.buzzes[buzzKey(state)] = [];
     broadcast();
   });
@@ -129,6 +137,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = result.buzzesOpen;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     if (result.resetCategory) {
       state.category = null;
       state.questionIndex = -1;
@@ -151,6 +160,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = false;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     state.wheelTarget = null;
     state.pendingJoker = false;
     state.buzzes[buzzKey(state)] = [];
@@ -165,6 +175,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = false;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     state.buzzes[buzzKey(state)] = [];
     broadcast();
   });
@@ -174,21 +185,25 @@ io.on("connection", (socket) => {
     state.buzzesOpen = true;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     broadcast();
   });
 
   // Starts (or restarts) the 10s elimination countdown for whichever buzz
-  // is now first in line.
+  // is now first in line. Clears buzzDelayUntil - we're past the post-expiry
+  // delay now that a fresh timer is starting.
   socket.on("host:startBuzzTimer", ({ pid } = {}) => {
     if (!pid) return;
     state.buzzExpireAt = Date.now() + BUZZ_TIMEOUT_MS;
     state.buzzTopPid = pid;
+    state.buzzDelayUntil = null;
     broadcast();
   });
 
   // The current top buzzer ran out of time: mark their buzz expired (drops
-  // off the list, but the record stays so they can't re-buzz) and clear the
-  // timer so the host's next tick starts a fresh 10s for whoever's next.
+  // off the list, but the record stays so they can't re-buzz), clear the
+  // timer, and set buzzDelayUntil so the host's loop waits out the TV's
+  // "wrong buzzer" sound effect before starting the next buzzer's fresh 10s.
   socket.on("host:expireBuzz", ({ pid } = {}) => {
     if (!pid) return;
     const key = buzzKey(state);
@@ -197,6 +212,7 @@ io.on("connection", (socket) => {
     if (entry) entry.expired = true;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = Date.now() + BUZZ_WRONG_SOUND_MS;
     broadcast();
   });
 
@@ -205,6 +221,7 @@ io.on("connection", (socket) => {
     state.buzzesOpen = false;
     state.buzzExpireAt = null;
     state.buzzTopPid = null;
+    state.buzzDelayUntil = null;
     broadcast();
   });
 
