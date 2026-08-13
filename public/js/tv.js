@@ -177,22 +177,25 @@ function renderQuestionLoop() {
     </div>
   `;
 
-  if (buzzableStep && state.buzzesOpen && buzzes.length) startBuzzCountdownDisplay();
 }
 
-// Ticks the "#buzzCountdown" text every 250ms without a full re-render, so
-// the TV shows the 10s elimination window counting down live.
-let buzzCountdownInterval = null;
-function startBuzzCountdownDisplay() {
-  if (buzzCountdownInterval) clearInterval(buzzCountdownInterval);
-  buzzCountdownInterval = setInterval(() => {
-    const el = document.getElementById("buzzCountdown");
-    if (!el) return;
-    if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
-    const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
-    el.textContent = `${remaining}s`;
-  }, 250);
-}
+// Ticks the "#buzzCountdown" text every 250ms. Started ONCE below, at file
+// scope, rather than restarted from inside renderQuestionLoop() - state
+// updates unrelated to the buzz (score, buzzesOpen toggles, a new buzzer
+// taking the lead, etc.) call renderQuestionLoop() and rebuild app.innerHTML
+// far more often than the countdown itself changes. Restarting the interval
+// on every one of those rebuilds meant the display didn't tick again until
+// up to 250ms after the latest render, which showed up as visible lag/stutter
+// right when someone buzzed in. A single continuous interval - mirroring how
+// host.js already does this - just polls whatever #buzzCountdown element
+// currently exists in the DOM, so it keeps ticking smoothly across renders.
+setInterval(() => {
+  const el = document.getElementById("buzzCountdown");
+  if (!el) return;
+  if (!state.buzzExpireAt) { el.textContent = "10s"; return; }
+  const remaining = Math.max(0, Math.ceil((state.buzzExpireAt - Date.now()) / 1000));
+  el.textContent = `${remaining}s`;
+}, 250);
 
 // ---------- TIE-BREAKER "what next" STEP ----------
 function renderTiebreakDone() {
